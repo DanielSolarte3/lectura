@@ -26,7 +26,7 @@ export interface FilaPregunta {
 }
 
 // La API devuelve máximo 1000 filas por consulta: se pide por páginas.
-async function traerTodo<T>(
+export async function traerTodo<T>(
   consulta: (
     desde: number,
     hasta: number,
