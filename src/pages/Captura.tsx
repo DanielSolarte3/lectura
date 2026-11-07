@@ -10,7 +10,9 @@ import {
 import {
   listarExamenes,
   listarPreguntasDeExamen,
-  existeIntento,
+  listarEstudiantes,
+  crearEstudiante,
+  actualizarEstudiante,
   registrarRespuestas,
   listarIntentosDeExamen,
   cargarIntento,
@@ -18,53 +20,91 @@ import {
   type ExamenResumen,
   type PreguntaExamen,
   type IntentoCargado,
+  type Estudiante,
+  type ErrorEstudiante,
 } from "../lib/captura";
 
 const CODIGO_REGEX = /^[A-Z0-9]+(-[A-Z0-9]+)*$/;
-const TAM_PAGINA = 50;
+const TAM_PAGINA = 25;
+const MAX_SUGERENCIAS = 50;
 const ETIQUETA: Record<Nivel, string> = {
   literal: "Literal",
   inferencial: "Inferencial",
   critico: "Crítico",
 };
+const MENSAJE_ERROR_ESTUDIANTE: Record<ErrorEstudiante, string> = {
+  codigo_repetido: "Ya existe un estudiante con ese código.",
+  formato_invalido:
+    "El código solo puede tener letras, números y guiones (ej. INC-1).",
+  desconocido:
+    "No se pudo guardar el estudiante. Revisa la conexión e intenta de nuevo.",
+};
+
+// Para buscar sin importar mayúsculas ni tildes
+const normalizar = (s: string) =>
+  s
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+const porNombre = (a: Estudiante, b: Estudiante) =>
+  a.nombre.localeCompare(b.nombre, "es") || a.codigo.localeCompare(b.codigo);
+
+interface FormEstudiante {
+  modo: "nuevo" | "editar";
+  nombre: string;
+  codigo: string;
+  original: string | null; // código antes de editar
+}
 
 export default function Captura() {
   const [examenes, setExamenes] = useState<ExamenResumen[]>([]);
   const [examenId, setExamenId] = useState<number | null>(null);
   const [preguntas, setPreguntas] = useState<PreguntaExamen[]>([]);
+  const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
   const [intentos, setIntentos] = useState<IntentoCargado[]>([]);
   const [cargandoLista, setCargandoLista] = useState(true);
+  const [errorCarga, setErrorCarga] = useState(false);
 
-  const [codigo, setCodigo] = useState("");
-  const [resp, setResp] = useState<(Opcion | null)[]>([]);
-  const [editando, setEditando] = useState<string | null>(null);
+  // Selección de estudiante
+  const [seleccionado, setSeleccionado] = useState<Estudiante | null>(null);
   const [busqueda, setBusqueda] = useState("");
-  const [pagina, setPagina] = useState(0);
+  const [enfocado, setEnfocado] = useState(false);
+  const [resaltado, setResaltado] = useState(0);
+  const [formulario, setFormulario] = useState<FormEstudiante | null>(null);
+  const [guardandoEst, setGuardandoEst] = useState(false);
+
+  // Captura de respuestas
+  const [resp, setResp] = useState<(Opcion | null)[]>([]);
+  const [guardando, setGuardando] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
   const [mensaje, setMensaje] = useState<{
     tipo: "ok" | "error";
     texto: string;
   } | null>(null);
-  const [guardando, setGuardando] = useState(false);
-  const [errorCarga, setErrorCarga] = useState(false);
 
+  // Lista de cargados
+  const [busquedaTabla, setBusquedaTabla] = useState("");
+  const [pagina, setPagina] = useState(0);
   const [seleccion, setSeleccion] = useState<Set<number>>(new Set());
-  const [eliminando, setEliminando] = useState(false);
 
-  const codigoRef = useRef<HTMLInputElement>(null);
+  const buscadorRef = useRef<HTMLInputElement>(null);
   const celdas = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Carga inicial: exámenes y grupos
+  // Carga inicial: exámenes y estudiantes
   useEffect(() => {
-    Promise.all([listarExamenes()])
-      .then(([ex]) => {
+    Promise.all([listarExamenes(), listarEstudiantes()])
+      .then(([ex, est]) => {
         setExamenes(ex);
+        setEstudiantes(est);
         const inicial = ex.find((e) => e.tipo === "pre" && e.activo) ?? ex[0];
         if (inicial) setExamenId(inicial.id);
       })
       .catch(() => setErrorCarga(true));
   }, []);
 
-  // Al cambiar de examen: preguntas + todo lo que ya se ha cargado en él
+  // Al cambiar de examen: preguntas + todo lo ya cargado en él
   useEffect(() => {
     if (examenId === null) return;
     let vigente = true;
@@ -73,13 +113,13 @@ export default function Captura() {
     setPreguntas([]);
     setIntentos([]);
     setResp([]);
-    setCodigo("");
-    setEditando(null);
+    setSeleccionado(null);
+    setFormulario(null);
     setBusqueda("");
+    setBusquedaTabla("");
     setPagina(0);
-    setMensaje(null);
-
     setSeleccion(new Set());
+    setMensaje(null);
 
     Promise.all([
       listarPreguntasDeExamen(examenId),
@@ -103,21 +143,38 @@ export default function Captura() {
     };
   }, [examenId]);
 
+  // Al seleccionar un estudiante, el cursor pasa a la primera pregunta
+  const codigoSel = seleccionado?.codigo ?? null;
+  useEffect(() => {
+    if (codigoSel) celdas.current[0]?.focus();
+  }, [codigoSel]);
+
   const vista = useMemo(() => clasificar(contar(resp)), [resp]);
   const contestadas = vista.total;
 
-  // Lista de lo ya cargado: respuestas alineadas con las preguntas del examen
+  const intentoDe = useMemo(
+    () => new Map(intentos.map((i) => [i.codigo, i])),
+    [intentos],
+  );
+
+  const sugerencias = useMemo(() => {
+    const q = normalizar(busqueda);
+    return estudiantes
+      .filter((e) => !q || normalizar(e.nombre).includes(q))
+      .slice(0, MAX_SUGERENCIAS);
+  }, [estudiantes, busqueda]);
+
   const filasLista = useMemo(() => {
-    const q = busqueda.trim().toUpperCase();
+    const q = normalizar(busquedaTabla);
     return intentos
-      .filter((i) => !q || i.codigo.includes(q))
+      .filter((i) => !q || normalizar(i.nombre).includes(q))
       .map((intento) => {
         const letras = preguntas.map(
           (p) => intento.respuestas[p.pregunta_id] ?? null,
         );
         return { intento, letras, ...clasificar(contar(letras)) };
       });
-  }, [intentos, preguntas, busqueda]);
+  }, [intentos, preguntas, busquedaTabla]);
 
   const totalPaginas = Math.max(1, Math.ceil(filasLista.length / TAM_PAGINA));
   const paginaActual = Math.min(pagina, totalPaginas - 1);
@@ -125,72 +182,141 @@ export default function Captura() {
     paginaActual * TAM_PAGINA,
     (paginaActual + 1) * TAM_PAGINA,
   );
-
   const idsVisibles = visibles.map((v) => v.intento.id);
   const todosMarcados =
     idsVisibles.length > 0 && idsVisibles.every((id) => seleccion.has(id));
 
-  function alternar(id: number) {
-    setSeleccion((s) => {
-      const n = new Set(s);
-      if (n.has(id)) n.delete(id);
-      else n.add(id);
-      return n;
-    });
-  }
+  // ---------- Selección y edición de estudiantes ----------
 
-  function alternarVisibles() {
-    setSeleccion((s) => {
-      const n = new Set(s);
-      for (const id of idsVisibles) {
-        if (todosMarcados) n.delete(id);
-        else n.add(id);
-      }
-      return n;
-    });
-  }
-
-  async function eliminar(ids: number[]) {
-    if (ids.length === 0 || eliminando) return;
-
-    const codigos = intentos
-      .filter((i) => ids.includes(i.id))
-      .map((i) => i.codigo);
-    const examen =
-      examenes.find((e) => e.id === examenId)?.nombre ?? "este examen";
-    const texto =
-      ids.length === 1
-        ? `¿Eliminar las respuestas de ${codigos[0]} en ${examen}? Esta acción no se puede deshacer.`
-        : `¿Eliminar las respuestas de ${ids.length} estudiantes en ${examen}? Esta acción no se puede deshacer.`;
-    if (!confirm(texto)) return;
-
-    setEliminando(true);
+  function elegir(est: Estudiante) {
+    const previo = intentoDe.get(est.codigo);
+    setSeleccionado(est);
+    setResp(
+      preguntas.map((p) =>
+        previo ? (previo.respuestas[p.pregunta_id] ?? null) : null,
+      ),
+    );
+    setBusqueda("");
+    setResaltado(0);
+    setFormulario(null);
     setMensaje(null);
-    try {
-      await eliminarIntentos(ids);
-      setIntentos((prev) => prev.filter((i) => !ids.includes(i.id)));
-      setSeleccion((prev) => {
-        const n = new Set(prev);
-        ids.forEach((id) => n.delete(id));
-        return n;
-      });
-      if (editando && codigos.includes(editando)) cancelarEdicion();
-      setMensaje({
-        tipo: "ok",
-        texto:
-          ids.length === 1
-            ? `${codigos[0]} eliminado.`
-            : `${ids.length} filas eliminadas.`,
-      });
-    } catch {
-      setMensaje({
-        tipo: "error",
-        texto: "No se pudo eliminar. Revisa la conexión e intenta de nuevo.",
-      });
-    } finally {
-      setEliminando(false);
+  }
+
+  function quitarSeleccion() {
+    setSeleccionado(null);
+    setResp(Array(preguntas.length).fill(null));
+    setBusqueda("");
+    setResaltado(0);
+    setTimeout(() => buscadorRef.current?.focus(), 0);
+  }
+
+  function teclaBuscador(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setResaltado((i) => Math.min(i + 1, sugerencias.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setResaltado((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const s = sugerencias[resaltado];
+      if (s) elegir(s);
     }
   }
+
+  function abrirNuevo() {
+    setFormulario({
+      modo: "nuevo",
+      nombre: busqueda.trim(),
+      codigo: "",
+      original: null,
+    });
+    setMensaje(null);
+  }
+
+  function abrirEditar() {
+    if (!seleccionado) return;
+    setFormulario({
+      modo: "editar",
+      nombre: seleccionado.nombre,
+      codigo: seleccionado.codigo,
+      original: seleccionado.codigo,
+    });
+    setMensaje(null);
+  }
+
+  async function guardarEstudiante() {
+    if (!formulario || guardandoEst) return;
+
+    const nombre = formulario.nombre.trim().replace(/\s+/g, " ");
+    const codigo = formulario.codigo.trim().toUpperCase();
+
+    if (!nombre) {
+      return setMensaje({
+        tipo: "error",
+        texto: "Escribe el nombre del estudiante.",
+      });
+    }
+    if (!CODIGO_REGEX.test(codigo)) {
+      return setMensaje({
+        tipo: "error",
+        texto: MENSAJE_ERROR_ESTUDIANTE.formato_invalido,
+      });
+    }
+
+    // Aviso de posible duplicado por nombre
+    const homonimo = estudiantes.find(
+      (e) =>
+        e.codigo !== formulario.original &&
+        normalizar(e.nombre) === normalizar(nombre),
+    );
+    if (
+      homonimo &&
+      !confirm(
+        `Ya existe un estudiante llamado "${homonimo.nombre}" (código ${homonimo.codigo}). ¿Guardar de todas formas?`,
+      )
+    )
+      return;
+
+    setMensaje(null);
+    setGuardandoEst(true);
+    const r =
+      formulario.modo === "nuevo"
+        ? await crearEstudiante(codigo, nombre)
+        : await actualizarEstudiante(formulario.original!, codigo, nombre);
+    setGuardandoEst(false);
+
+    if (r.estudiante === null) {
+      return setMensaje({
+        tipo: "error",
+        texto: MENSAJE_ERROR_ESTUDIANTE[r.error],
+      });
+    }
+
+    const est = r.estudiante;
+    const codigoAnterior = formulario.original;
+    setEstudiantes((prev) =>
+      [...prev.filter((e) => e.codigo !== codigoAnterior), est].sort(porNombre),
+    );
+
+    if (formulario.modo === "editar") {
+      setIntentos((prev) =>
+        prev.map((i) =>
+          i.codigo === codigoAnterior
+            ? { ...i, codigo: est.codigo, nombre: est.nombre }
+            : i,
+        ),
+      );
+      setSeleccionado(est);
+      setFormulario(null);
+      setMensaje({ tipo: "ok", texto: "Datos del estudiante actualizados." });
+    } else {
+      elegir(est);
+      setMensaje({ tipo: "ok", texto: `${est.nombre} agregado.` });
+    }
+  }
+
+  // ---------- Captura de respuestas ----------
 
   function cambiarCelda(i: number, valor: string) {
     const v = valor.slice(-1).toUpperCase();
@@ -223,32 +349,8 @@ export default function Captura() {
     }
   }
 
-  function editar(intento: IntentoCargado, letras: (Opcion | null)[]) {
-    setCodigo(intento.codigo);
-    setResp(letras);
-    setEditando(intento.codigo);
-    setMensaje(null);
-    window.scrollTo({ top: 0, behavior: "smooth" });
-    celdas.current[0]?.focus();
-  }
-
-  function cancelarEdicion() {
-    setCodigo("");
-    setResp(Array(preguntas.length).fill(null));
-    setEditando(null);
-    codigoRef.current?.focus();
-  }
-
   async function guardar() {
-    if (guardando || examenId === null) return;
-
-    const cod = codigo.trim().toUpperCase();
-    if (!CODIGO_REGEX.test(cod)) {
-      return setMensaje({
-        tipo: "error",
-        texto: "Código no válido: solo letras, números y guiones (ej. INC-1).",
-      });
-    }
+    if (guardando || examenId === null || !seleccionado) return;
     if (contestadas === 0) {
       return setMensaje({
         tipo: "error",
@@ -256,18 +358,12 @@ export default function Captura() {
       });
     }
 
-    const esEdicion = editando === cod;
+    const est = seleccionado;
+    const eraActualizacion = intentoDe.has(est.codigo);
 
     setMensaje(null);
     setGuardando(true);
     try {
-      if (
-        !esEdicion &&
-        (await existeIntento(cod, examenId)) &&
-        !confirm(`${cod} ya tiene respuestas en este examen. ¿Reemplazarlas?`)
-      )
-        return;
-
       if (
         contestadas < MIN_RESPUESTAS &&
         !confirm(
@@ -282,32 +378,31 @@ export default function Captura() {
         if (r) payload[p.pregunta_id] = r;
       });
 
-      const fallo = await registrarRespuestas(cod, examenId, payload);
+      const fallo = await registrarRespuestas(est.codigo, examenId, payload);
       if (fallo) {
         return setMensaje({
           tipo: "error",
           texto:
-            fallo === "codigo_invalido"
-              ? "El código no tiene un formato válido."
+            fallo === "estudiante_no_existe"
+              ? "Ese estudiante ya no existe. Vuelve a buscarlo o agrégalo de nuevo."
               : "No se pudo guardar. Revisa la conexión e intenta de nuevo.",
         });
       }
 
-      // Refrescar solo esta fila en la lista (sube al primer lugar)
-      const nuevo = await cargarIntento(cod, examenId).catch(() => null);
+      const nuevo = await cargarIntento(est.codigo, examenId).catch(() => null);
       if (nuevo) {
-        setIntentos((prev) => [nuevo, ...prev.filter((x) => x.codigo !== cod)]);
+        setIntentos((prev) => [
+          nuevo,
+          ...prev.filter((x) => x.codigo !== nuevo.codigo),
+        ]);
         setPagina(0);
       }
 
       setMensaje({
         tipo: "ok",
-        texto: `${cod} ${esEdicion ? "actualizado" : "guardado"}.`,
+        texto: `${est.nombre} ${eraActualizacion ? "actualizado" : "guardado"}.`,
       });
-      setCodigo("");
-      setResp(Array(preguntas.length).fill(null));
-      setEditando(null);
-      codigoRef.current?.focus();
+      quitarSeleccion();
     } catch {
       setMensaje({
         tipo: "error",
@@ -315,6 +410,82 @@ export default function Captura() {
       });
     } finally {
       setGuardando(false);
+    }
+  }
+
+  // ---------- Lista de cargados ----------
+
+  function editarIntento(intento: IntentoCargado) {
+    const est = estudiantes.find((e) => e.codigo === intento.codigo) ?? {
+      codigo: intento.codigo,
+      nombre: intento.nombre,
+    };
+    elegir(est);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function alternar(id: number) {
+    setSeleccion((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }
+
+  function alternarVisibles() {
+    setSeleccion((s) => {
+      const n = new Set(s);
+      for (const id of idsVisibles) {
+        if (todosMarcados) n.delete(id);
+        else n.add(id);
+      }
+      return n;
+    });
+  }
+
+  async function eliminar(ids: number[]) {
+    if (ids.length === 0 || eliminando) return;
+
+    const afectados = intentos.filter((i) => ids.includes(i.id));
+    const examen =
+      examenes.find((e) => e.id === examenId)?.nombre ?? "este examen";
+    const texto =
+      ids.length === 1
+        ? `¿Eliminar las respuestas de ${afectados[0]?.nombre} en ${examen}? Esta acción no se puede deshacer.`
+        : `¿Eliminar las respuestas de ${ids.length} estudiantes en ${examen}? Esta acción no se puede deshacer.`;
+    if (!confirm(texto)) return;
+
+    setEliminando(true);
+    setMensaje(null);
+    try {
+      await eliminarIntentos(ids);
+      setIntentos((prev) => prev.filter((i) => !ids.includes(i.id)));
+      setSeleccion((prev) => {
+        const n = new Set(prev);
+        ids.forEach((id) => n.delete(id));
+        return n;
+      });
+      if (
+        seleccionado &&
+        afectados.some((i) => i.codigo === seleccionado.codigo)
+      ) {
+        quitarSeleccion();
+      }
+      setMensaje({
+        tipo: "ok",
+        texto:
+          ids.length === 1
+            ? `${afectados[0]?.nombre} eliminado de este examen.`
+            : `${ids.length} filas eliminadas.`,
+      });
+    } catch {
+      setMensaje({
+        tipo: "error",
+        texto: "No se pudo eliminar. Revisa la conexión e intenta de nuevo.",
+      });
+    } finally {
+      setEliminando(false);
     }
   }
 
@@ -353,69 +524,174 @@ export default function Captura() {
         </p>
       ) : (
         <section className="fila-captura">
-          {editando && (
-            <p className="editando">
-              Editando <strong>{editando}</strong> (se conserva su grupo).{" "}
-              <button type="button" onClick={cancelarEdicion}>
-                Cancelar
-              </button>
-            </p>
-          )}
-
-          <label>
-            Código del estudiante
-            <input
-              ref={codigoRef}
-              value={codigo}
-              onChange={(e) => setCodigo(e.target.value.toUpperCase())}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  celdas.current[0]?.focus();
-                }
+          {formulario ? (
+            <form
+              className="form-estudiante"
+              onSubmit={(e) => {
+                e.preventDefault();
+                guardarEstudiante();
               }}
-              placeholder="INC-1"
-              autoComplete="off"
-              autoFocus
-            />
-          </label>
-
-          <div className="celdas">
-            {preguntas.map((p, i) => (
-              <div key={p.pregunta_id} className="celda">
-                <span>{p.numero}</span>
+            >
+              <h3>
+                {formulario.modo === "nuevo"
+                  ? "Nuevo estudiante"
+                  : "Editar estudiante"}
+              </h3>
+              <label>
+                Nombre completo
                 <input
-                  ref={(el) => {
-                    celdas.current[i] = el;
-                  }}
-                  value={resp[i] ?? ""}
-                  onChange={(e) => cambiarCelda(i, e.target.value)}
-                  onKeyDown={(e) => teclaCelda(i, e)}
-                  onFocus={(e) => e.target.select()}
+                  value={formulario.nombre}
+                  onChange={(e) =>
+                    setFormulario({ ...formulario, nombre: e.target.value })
+                  }
                   autoComplete="off"
-                  aria-label={`Pregunta ${p.numero}`}
+                  autoFocus
                 />
+              </label>
+              <label>
+                Código
+                <input
+                  value={formulario.codigo}
+                  onChange={(e) =>
+                    setFormulario({
+                      ...formulario,
+                      codigo: e.target.value.toUpperCase(),
+                    })
+                  }
+                  placeholder="INC-1"
+                  autoComplete="off"
+                />
+              </label>
+              {formulario.modo === "editar" &&
+                formulario.codigo.trim().toUpperCase() !==
+                  formulario.original && (
+                  <p className="ayuda">
+                    Al cambiar el código, sus respuestas ya cargadas pasan al
+                    código nuevo.
+                  </p>
+                )}
+              <div className="fila">
+                <button type="submit" disabled={guardandoEst}>
+                  {guardandoEst ? "Guardando…" : "Guardar estudiante"}
+                </button>
+                <button type="button" onClick={() => setFormulario(null)}>
+                  Cancelar
+                </button>
               </div>
-            ))}
-          </div>
+            </form>
+          ) : seleccionado ? (
+            <>
+              <div className="estudiante-sel">
+                <div>
+                  <strong>{seleccionado.nombre}</strong>
+                  <label className="codigo-auto">
+                    Código
+                    <input value={seleccionado.codigo} readOnly tabIndex={-1} />
+                  </label>
+                </div>
+                <div className="fila">
+                  <button type="button" onClick={abrirEditar}>
+                    Editar datos
+                  </button>
+                  <button type="button" onClick={quitarSeleccion}>
+                    Cambiar estudiante
+                  </button>
+                </div>
+              </div>
 
-          <p className="vista">
-            A: {vista.literal} · B: {vista.inferencial} · C: {vista.critico} ·
-            Respondidas: {contestadas} de {preguntas.length} →{" "}
-            <strong>
-              {vista.nivel
-                ? ETIQUETA[vista.nivel]
-                : `Excluido (menos de ${MIN_RESPUESTAS})`}
-            </strong>
-          </p>
+              {intentoDe.has(seleccionado.codigo) && (
+                <p className="editando">
+                  Este estudiante ya tiene respuestas en este examen. Al guardar
+                  se reemplazarán.
+                </p>
+              )}
 
-          <button type="button" onClick={guardar} disabled={guardando}>
-            {guardando ? "Guardando…" : "Guardar (Enter)"}
-          </button>
-          <p className="ayuda">
-            Escribe A, B o C y avanza solo. Espacio o guion = sin responder.
-            Retroceso vuelve a la casilla anterior.
-          </p>
+              <div className="celdas">
+                {preguntas.map((p, i) => (
+                  <div key={p.pregunta_id} className="celda">
+                    <span>{p.numero}</span>
+                    <input
+                      ref={(el) => {
+                        celdas.current[i] = el;
+                      }}
+                      value={resp[i] ?? ""}
+                      onChange={(e) => cambiarCelda(i, e.target.value)}
+                      onKeyDown={(e) => teclaCelda(i, e)}
+                      onFocus={(e) => e.target.select()}
+                      autoComplete="off"
+                      aria-label={`Pregunta ${p.numero}`}
+                    />
+                  </div>
+                ))}
+              </div>
+
+              <p className="vista">
+                A: {vista.literal} · B: {vista.inferencial} · C: {vista.critico}{" "}
+                · Respondidas: {contestadas} de {preguntas.length} →{" "}
+                <strong>
+                  {vista.nivel
+                    ? ETIQUETA[vista.nivel]
+                    : `Excluido (menos de ${MIN_RESPUESTAS})`}
+                </strong>
+              </p>
+
+              <button type="button" onClick={guardar} disabled={guardando}>
+                {guardando ? "Guardando…" : "Guardar (Enter)"}
+              </button>
+              <p className="ayuda">
+                Escribe A, B o C y avanza solo. Espacio o guion = sin responder.
+                Retroceso vuelve a la casilla anterior.
+              </p>
+            </>
+          ) : (
+            <div className="campo">
+              <span className="rotulo">Estudiante (busca por nombre)</span>
+              <div className="fila">
+                <div className="combo">
+                  <input
+                    ref={buscadorRef}
+                    value={busqueda}
+                    onChange={(e) => {
+                      setBusqueda(e.target.value);
+                      setResaltado(0);
+                    }}
+                    onFocus={() => setEnfocado(true)}
+                    onBlur={() => setEnfocado(false)}
+                    onKeyDown={teclaBuscador}
+                    placeholder="Escribe el nombre…"
+                    aria-label="Buscar estudiante por nombre"
+                    autoComplete="off"
+                    autoFocus
+                  />
+                  {enfocado && (
+                    <ul className="sugerencias">
+                      {sugerencias.map((e, i) => (
+                        <li
+                          key={e.codigo}
+                          className={i === resaltado ? "activa" : ""}
+                          onMouseDown={(ev) => {
+                            ev.preventDefault();
+                            elegir(e);
+                          }}
+                        >
+                          <span>{e.nombre}</span>
+                          {intentoDe.has(e.codigo) && (
+                            <span className="tag">ya cargado</span>
+                          )}
+                        </li>
+                      ))}
+                      {sugerencias.length === 0 && (
+                        <li className="vacia">Ningún estudiante coincide.</li>
+                      )}
+                    </ul>
+                  )}
+                </div>
+                <button type="button" onClick={abrirNuevo}>
+                  + Nuevo estudiante
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       )}
 
@@ -432,12 +708,12 @@ export default function Captura() {
           <div className="acciones-lista">
             <input
               className="buscador"
-              value={busqueda}
+              value={busquedaTabla}
               onChange={(e) => {
-                setBusqueda(e.target.value);
+                setBusquedaTabla(e.target.value);
                 setPagina(0);
               }}
-              placeholder="Buscar por código…"
+              placeholder="Buscar por nombre…"
               autoComplete="off"
             />
             {seleccion.size > 0 && (
@@ -461,7 +737,7 @@ export default function Captura() {
             <p>
               {intentos.length === 0
                 ? "Aún no hay respuestas cargadas en este examen."
-                : "Ningún código coincide con la búsqueda."}
+                : "Ningún nombre coincide con la búsqueda."}
             </p>
           ) : (
             <>
@@ -477,6 +753,7 @@ export default function Captura() {
                           aria-label="Seleccionar todos los de esta página"
                         />
                       </th>
+                      {/* <th>Nombre</th> */}
                       <th>Código</th>
                       {preguntas.map((p) => (
                         <th key={p.pregunta_id} className="l">
@@ -512,9 +789,10 @@ export default function Captura() {
                               type="checkbox"
                               checked={seleccion.has(intento.id)}
                               onChange={() => alternar(intento.id)}
-                              aria-label={`Seleccionar ${intento.codigo}`}
+                              aria-label={`Seleccionar ${intento.nombre}`}
                             />
                           </td>
+                          {/* <td>{intento.nombre}</td> */}
                           <td>{intento.codigo}</td>
                           {letras.map((l, i) => (
                             <td key={i} className="l">
@@ -535,9 +813,22 @@ export default function Captura() {
                           <td className="acciones-fila">
                             <button
                               type="button"
-                              onClick={() => editar(intento, letras)}
+                              onClick={() => editarIntento(intento)}
                             >
-                              Editar
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M12 20h9" />
+                                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" />
+                              </svg>
                             </button>
                             <button
                               type="button"
@@ -545,7 +836,23 @@ export default function Captura() {
                               onClick={() => eliminar([intento.id])}
                               disabled={eliminando}
                             >
-                              Eliminar
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M3 6h18" />
+                                <path d="M8 6V4h8v2" />
+                                <path d="M19 6l-1 14H6L5 6" />
+                                <path d="M10 11v5" />
+                                <path d="M14 11v5" />
+                              </svg>
                             </button>
                           </td>
                         </tr>

@@ -8,13 +8,13 @@ export interface ExamenResumen {
   tipo: "pre" | "post";
   activo: boolean;
 }
-export interface Grupo {
-  id: number;
-  nombre: string;
-}
 export interface PreguntaExamen {
   pregunta_id: number;
   numero: number;
+}
+export interface Estudiante {
+  codigo: string;
+  nombre: string;
 }
 
 export async function listarExamenes(): Promise<ExamenResumen[]> {
@@ -39,40 +39,62 @@ export async function listarPreguntasDeExamen(
   return data;
 }
 
-export async function listarGrupos(): Promise<Grupo[]> {
-  const { data, error } = await supabase
-    .from("grupos")
-    .select("id, nombre")
-    .order("nombre");
-  if (error) throw error;
-  return data;
+// ---------- Estudiantes ----------
+
+export async function listarEstudiantes(): Promise<Estudiante[]> {
+  return traerTodo<Estudiante>((desde, hasta) =>
+    supabase
+      .from("estudiantes")
+      .select("codigo, nombre")
+      .order("nombre")
+      .order("codigo")
+      .range(desde, hasta),
+  );
 }
 
-export async function crearGrupo(nombre: string): Promise<Grupo> {
-  const { data, error } = await supabase
-    .from("grupos")
-    .insert({ nombre })
-    .select("id, nombre")
-    .single();
-  if (error) throw error;
-  return data;
+export type ErrorEstudiante =
+  "codigo_repetido" | "formato_invalido" | "desconocido";
+export type ResultadoEstudiante =
+  | { estudiante: Estudiante; error: null }
+  | { estudiante: null; error: ErrorEstudiante };
+
+function mapearError(code?: string): ErrorEstudiante {
+  if (code === "23505") return "codigo_repetido"; // unique: el código ya existe
+  if (code === "23514") return "formato_invalido"; // check: formato del código o nombre vacío
+  return "desconocido";
 }
 
-export async function existeIntento(
+export async function crearEstudiante(
   codigo: string,
-  examenId: number,
-): Promise<boolean> {
+  nombre: string,
+): Promise<ResultadoEstudiante> {
   const { data, error } = await supabase
-    .from("intentos")
-    .select("id")
-    .eq("estudiante_codigo", codigo)
-    .eq("examen_id", examenId)
-    .maybeSingle();
-  if (error) throw error;
-  return data !== null;
+    .from("estudiantes")
+    .insert({ codigo, nombre })
+    .select("codigo, nombre")
+    .single();
+  if (error) return { estudiante: null, error: mapearError(error.code) };
+  return { estudiante: data, error: null };
 }
 
-export type ErrorRegistro = "codigo_invalido" | "desconocido";
+export async function actualizarEstudiante(
+  codigoActual: string,
+  codigo: string,
+  nombre: string,
+): Promise<ResultadoEstudiante> {
+  const { data, error } = await supabase
+    .from("estudiantes")
+    .update({ codigo, nombre })
+    .eq("codigo", codigoActual)
+    .select("codigo, nombre")
+    .single();
+  if (error) return { estudiante: null, error: mapearError(error.code) };
+  return { estudiante: data, error: null };
+}
+
+// ---------- Respuestas ----------
+
+export type ErrorRegistro = "estudiante_no_existe" | "desconocido";
 
 /** Devuelve null si todo salió bien, o el tipo de error. */
 export async function registrarRespuestas(
@@ -86,15 +108,14 @@ export async function registrarRespuestas(
     p_respuestas: respuestas,
   });
   if (!error) return null;
-  if (error.code === "23514") return "codigo_invalido"; // check del formato del código
+  if (error.code === "23503") return "estudiante_no_existe"; // llave foránea
   return "desconocido";
 }
 
 export interface IntentoCargado {
   id: number;
   codigo: string;
-  grupo_id: number | null;
-  grupo: string | null;
+  nombre: string;
   enviado_en: string;
   respuestas: Record<number, Opcion>; // id de pregunta → opción
 }
@@ -103,15 +124,12 @@ type IntentoCrudo = {
   id: number;
   estudiante_codigo: string;
   enviado_en: string;
-  estudiantes: {
-    grupo_id: number | null;
-    grupos: { nombre: string } | null;
-  } | null;
+  estudiantes: { nombre: string } | null;
   respuestas: { pregunta_id: number; opcion: Opcion }[];
 };
 
 const SELECT_INTENTO =
-  "id, estudiante_codigo, enviado_en, estudiantes ( grupo_id, grupos ( nombre ) ), respuestas ( pregunta_id, opcion )";
+  "id, estudiante_codigo, enviado_en, estudiantes ( nombre ), respuestas ( pregunta_id, opcion )";
 
 function aIntento(x: IntentoCrudo): IntentoCargado {
   const respuestas: Record<number, Opcion> = {};
@@ -119,8 +137,7 @@ function aIntento(x: IntentoCrudo): IntentoCargado {
   return {
     id: x.id,
     codigo: x.estudiante_codigo,
-    grupo_id: x.estudiantes?.grupo_id ?? null,
-    grupo: x.estudiantes?.grupos?.nombre ?? null,
+    nombre: x.estudiantes?.nombre ?? x.estudiante_codigo,
     enviado_en: x.enviado_en,
     respuestas,
   };
