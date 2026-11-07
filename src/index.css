@@ -159,3 +159,29 @@ section {
   border-radius: 6px;
   margin: 0;
 }
+.acciones-lista {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.acciones-lista .buscador {
+  margin-bottom: 0;
+}
+.acciones-fila {
+  white-space: nowrap;
+}
+.acciones-fila button + button {
+  margin-left: 0.4rem;
+}
+button.peligro {
+  background: #b91c1c;
+  color: #fff;
+  border: 0;
+  border-radius: 6px;
+}
+button.peligro:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

@@ -10,11 +10,15 @@ import {
 import {
   listarExamenes,
   listarPreguntasDeExamen,
+  listarGrupos,
+  crearGrupo,
   existeIntento,
   registrarRespuestas,
   listarIntentosDeExamen,
   cargarIntento,
+  eliminarIntentos,
   type ExamenResumen,
+  type Grupo,
   type PreguntaExamen,
   type IntentoCargado,
 } from "../lib/captura";
@@ -46,6 +50,9 @@ export default function Captura() {
   const [guardando, setGuardando] = useState(false);
   const [errorCarga, setErrorCarga] = useState(false);
 
+  const [seleccion, setSeleccion] = useState<Set<number>>(new Set());
+  const [eliminando, setEliminando] = useState(false);
+
   const codigoRef = useRef<HTMLInputElement>(null);
   const celdas = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -74,6 +81,8 @@ export default function Captura() {
     setBusqueda("");
     setPagina(0);
     setMensaje(null);
+
+    setSeleccion(new Set());
 
     Promise.all([
       listarPreguntasDeExamen(examenId),
@@ -119,6 +128,72 @@ export default function Captura() {
     paginaActual * TAM_PAGINA,
     (paginaActual + 1) * TAM_PAGINA,
   );
+
+  const idsVisibles = visibles.map((v) => v.intento.id);
+  const todosMarcados =
+    idsVisibles.length > 0 && idsVisibles.every((id) => seleccion.has(id));
+
+  function alternar(id: number) {
+    setSeleccion((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  }
+
+  function alternarVisibles() {
+    setSeleccion((s) => {
+      const n = new Set(s);
+      for (const id of idsVisibles) {
+        if (todosMarcados) n.delete(id);
+        else n.add(id);
+      }
+      return n;
+    });
+  }
+
+  async function eliminar(ids: number[]) {
+    if (ids.length === 0 || eliminando) return;
+
+    const codigos = intentos
+      .filter((i) => ids.includes(i.id))
+      .map((i) => i.codigo);
+    const examen =
+      examenes.find((e) => e.id === examenId)?.nombre ?? "este examen";
+    const texto =
+      ids.length === 1
+        ? `¿Eliminar las respuestas de ${codigos[0]} en ${examen}? Esta acción no se puede deshacer.`
+        : `¿Eliminar las respuestas de ${ids.length} estudiantes en ${examen}? Esta acción no se puede deshacer.`;
+    if (!confirm(texto)) return;
+
+    setEliminando(true);
+    setMensaje(null);
+    try {
+      await eliminarIntentos(ids);
+      setIntentos((prev) => prev.filter((i) => !ids.includes(i.id)));
+      setSeleccion((prev) => {
+        const n = new Set(prev);
+        ids.forEach((id) => n.delete(id));
+        return n;
+      });
+      if (editando && codigos.includes(editando)) cancelarEdicion();
+      setMensaje({
+        tipo: "ok",
+        texto:
+          ids.length === 1
+            ? `${codigos[0]} eliminado.`
+            : `${ids.length} filas eliminadas.`,
+      });
+    } catch {
+      setMensaje({
+        tipo: "error",
+        texto: "No se pudo eliminar. Revisa la conexión e intenta de nuevo.",
+      });
+    } finally {
+      setEliminando(false);
+    }
+  }
 
   function cambiarCelda(i: number, valor: string) {
     const v = valor.slice(-1).toUpperCase();
@@ -210,11 +285,7 @@ export default function Captura() {
         if (r) payload[p.pregunta_id] = r;
       });
 
-      const fallo = await registrarRespuestas(
-        cod,
-        examenId,
-        payload
-      );
+      const fallo = await registrarRespuestas(cod, examenId, payload);
       if (fallo) {
         return setMensaje({
           tipo: "error",
@@ -361,16 +432,33 @@ export default function Captura() {
         <section>
           <h2>Cargados en este examen ({intentos.length})</h2>
 
-          <input
-            className="buscador"
-            value={busqueda}
-            onChange={(e) => {
-              setBusqueda(e.target.value);
-              setPagina(0);
-            }}
-            placeholder="Buscar por código…"
-            autoComplete="off"
-          />
+          <div className="acciones-lista">
+            <input
+              className="buscador"
+              value={busqueda}
+              onChange={(e) => {
+                setBusqueda(e.target.value);
+                setPagina(0);
+              }}
+              placeholder="Buscar por código…"
+              autoComplete="off"
+            />
+            {seleccion.size > 0 && (
+              <>
+                <button
+                  type="button"
+                  className="peligro"
+                  onClick={() => eliminar([...seleccion])}
+                  disabled={eliminando}
+                >
+                  Eliminar seleccionadas ({seleccion.size})
+                </button>
+                <button type="button" onClick={() => setSeleccion(new Set())}>
+                  Limpiar selección
+                </button>
+              </>
+            )}
+          </div>
 
           {filasLista.length === 0 ? (
             <p>
@@ -384,8 +472,15 @@ export default function Captura() {
                 <table className="tabla-cargados">
                   <thead>
                     <tr>
+                      <th>
+                        <input
+                          type="checkbox"
+                          checked={todosMarcados}
+                          onChange={alternarVisibles}
+                          aria-label="Seleccionar todos los de esta página"
+                        />
+                      </th>
                       <th>Código</th>
-
                       {preguntas.map((p) => (
                         <th key={p.pregunta_id} className="l">
                           {p.numero}
@@ -415,6 +510,14 @@ export default function Captura() {
                           key={intento.id}
                           className={nivel ? "" : "excluido"}
                         >
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={seleccion.has(intento.id)}
+                              onChange={() => alternar(intento.id)}
+                              aria-label={`Seleccionar ${intento.codigo}`}
+                            />
+                          </td>
                           <td>{intento.codigo}</td>
                           {letras.map((l, i) => (
                             <td key={i} className="l">
@@ -432,12 +535,20 @@ export default function Captura() {
                               { dateStyle: "short", timeStyle: "short" },
                             )}
                           </td>
-                          <td>
+                          <td className="acciones-fila">
                             <button
                               type="button"
                               onClick={() => editar(intento, letras)}
                             >
                               Editar
+                            </button>
+                            <button
+                              type="button"
+                              className="peligro"
+                              onClick={() => eliminar([intento.id])}
+                              disabled={eliminando}
+                            >
+                              Eliminar
                             </button>
                           </td>
                         </tr>

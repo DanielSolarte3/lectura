@@ -207,11 +207,13 @@ export default function Resultados() {
       </section>
 
       <TablaSumas
-        titulo={`Sumas por pregunta: ${nombreExamen(preId)}`}
+        tipo="pre"
+        titulo={`${nombreExamen(preId)}`}
         sumas={sumasPre}
       />
       <TablaSumas
-        titulo={`Sumas por pregunta: ${nombreExamen(postId)}`}
+        tipo="post"
+        titulo={`${nombreExamen(postId)}`}
         sumas={sumasPost}
       />
       <p className="ayuda">
@@ -223,9 +225,11 @@ export default function Resultados() {
 }
 
 function TablaSumas({
+  tipo,
   titulo,
   sumas,
 }: {
+  tipo: "pre" | "post";
   titulo: string;
   sumas: SumaPregunta[];
 }) {
@@ -233,7 +237,8 @@ function TablaSumas({
   const textos = sumarPorTexto(sumas);
   return (
     <section>
-      <h2>{titulo}</h2>
+      <h1>{titulo + ` (${tipo})`}</h1>
+      <h2>Por pregunta</h2>
       <div className="tabla-scroll">
         <table>
           <thead>
@@ -258,7 +263,7 @@ function TablaSumas({
           </tbody>
         </table>
       </div>
-      <h3>Por texto</h3>
+      <h2>Por texto</h2>
       <div className="tabla-scroll">
         <table>
           <thead>

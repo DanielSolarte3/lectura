@@ -156,3 +156,8 @@ export async function cargarIntento(
   if (error) throw error;
   return data ? aIntento(data as unknown as IntentoCrudo) : null;
 }
+
+export async function eliminarIntentos(ids: number[]): Promise<void> {
+  const { error } = await supabase.rpc("eliminar_intentos", { p_ids: ids });
+  if (error) throw error;
+}
