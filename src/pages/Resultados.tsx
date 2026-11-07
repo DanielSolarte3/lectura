@@ -5,12 +5,7 @@ import {
   type Nivel,
   type Resultado,
 } from "../lib/clasificacion";
-import {
-  listarExamenes,
-  listarGrupos,
-  type ExamenResumen,
-  type Grupo,
-} from "../lib/captura";
+import { listarExamenes, type ExamenResumen } from "../lib/captura";
 import {
   cargarResultados,
   cargarPorPregunta,
@@ -22,10 +17,8 @@ import {
   resumir,
   sumarPorPregunta,
   sumarPorTexto,
-  coincideGrupo,
   ETIQUETA,
   CAMBIO,
-  type FiltroGrupo,
   type SumaPregunta,
 } from "../lib/analisis";
 import { exportarExcel } from "../lib/exportar";
@@ -38,25 +31,17 @@ const conteo = (i: Resultado | null) =>
 
 export default function Resultados() {
   const [examenes, setExamenes] = useState<ExamenResumen[]>([]);
-  const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [resultados, setResultados] = useState<FilaResultado[]>([]);
   const [porPregunta, setPorPregunta] = useState<FilaPregunta[]>([]);
   const [preId, setPreId] = useState<number | null>(null);
   const [postId, setPostId] = useState<number | null>(null);
-  const [filtro, setFiltro] = useState<FiltroGrupo>("todos");
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    Promise.all([
-      listarExamenes(),
-      listarGrupos(),
-      cargarResultados(),
-      cargarPorPregunta(),
-    ])
-      .then(([ex, gr, res, pp]) => {
+    Promise.all([listarExamenes(), cargarResultados(), cargarPorPregunta()])
+      .then(([ex, res, pp]) => {
         setExamenes(ex);
-        setGrupos(gr);
         setResultados(res);
         setPorPregunta(pp);
         const elegir = (tipo: "pre" | "post") =>
@@ -72,20 +57,17 @@ export default function Resultados() {
   }, []);
 
   const filas = useMemo(
-    () =>
-      armarFilas(resultados, preId, postId).filter((f) =>
-        coincideGrupo(f.grupo_id, filtro),
-      ),
-    [resultados, preId, postId, filtro],
+    () => armarFilas(resultados, preId, postId),
+    [resultados, preId, postId],
   );
   const resumen = useMemo(() => resumir(filas), [filas]);
   const sumasPre = useMemo(
-    () => sumarPorPregunta(porPregunta, preId, filtro),
-    [porPregunta, preId, filtro],
+    () => sumarPorPregunta(porPregunta, preId, "todos"),
+    [porPregunta, preId],
   );
   const sumasPost = useMemo(
-    () => sumarPorPregunta(porPregunta, postId, filtro),
-    [porPregunta, postId, filtro],
+    () => sumarPorPregunta(porPregunta, postId, "todos"),
+    [porPregunta, postId],
   );
 
   const nombreExamen = (id: number | null) =>
@@ -141,24 +123,6 @@ export default function Resultados() {
                   {e.nombre}
                 </option>
               ))}
-          </select>
-        </label>
-        <label>
-          Grupo
-          <select
-            value={String(filtro)}
-            onChange={(e) => {
-              const v = e.target.value;
-              setFiltro(v === "todos" || v === "sin" ? v : Number(v));
-            }}
-          >
-            <option value="todos">Todos</option>
-            <option value="sin">Sin grupo</option>
-            {grupos.map((g) => (
-              <option key={g.id} value={g.id}>
-                {g.nombre}
-              </option>
-            ))}
           </select>
         </label>
         <button type="button" onClick={exportar} disabled={filas.length === 0}>
@@ -234,7 +198,7 @@ export default function Resultados() {
               ))}
               {filas.length === 0 && (
                 <tr>
-                  <td colSpan={8}>No hay datos para mostrar.</td>
+                  <td colSpan={7}>No hay datos para mostrar.</td>
                 </tr>
               )}
             </tbody>

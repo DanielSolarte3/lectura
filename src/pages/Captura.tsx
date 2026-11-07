@@ -10,7 +10,6 @@ import {
 import {
   listarExamenes,
   listarPreguntasDeExamen,
-  listarGrupos,
   existeIntento,
   registrarRespuestas,
   listarIntentosDeExamen,
@@ -52,8 +51,8 @@ export default function Captura() {
 
   // Carga inicial: exámenes y grupos
   useEffect(() => {
-    Promise.all([listarExamenes(), listarGrupos()])
-      .then(([ex, gr]) => {
+    Promise.all([listarExamenes()])
+      .then(([ex]) => {
         setExamenes(ex);
         const inicial = ex.find((e) => e.tipo === "pre" && e.activo) ?? ex[0];
         if (inicial) setExamenId(inicial.id);
