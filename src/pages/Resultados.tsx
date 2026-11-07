@@ -22,6 +22,7 @@ import {
   type SumaPregunta,
 } from "../lib/analisis";
 import { exportarExcel } from "../lib/exportar";
+import Cargando from "../components/Cargando";
 
 const NIVELES: Nivel[] = ["literal", "inferencial", "critico"];
 const pct = (n: number, total: number) =>
@@ -85,7 +86,14 @@ export default function Resultados() {
     );
   }
 
-  if (cargando) return <p>Cargando…</p>;
+  if (cargando) {
+    return (
+      <div className="captura">
+        <Encabezado />
+        <Cargando texto="Cargando resultados…" />
+      </div>
+    );
+  }
   if (error)
     return <p>No se pudieron cargar los resultados. Recarga la página.</p>;
 
@@ -125,7 +133,12 @@ export default function Resultados() {
               ))}
           </select>
         </label>
-        <button type="button" onClick={exportar} disabled={filas.length === 0}>
+        <button
+          type="button"
+          className="primario"
+          onClick={exportar}
+          disabled={filas.length === 0}
+        >
           Exportar a Excel
         </button>
       </div>

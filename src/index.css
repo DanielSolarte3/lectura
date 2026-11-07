@@ -1,197 +1,248 @@
+:root {
+  color-scheme: light;
+  --fondo: #f7f8fa;
+  --superficie: #ffffff;
+  --texto: #1f2937;
+  --muted: #6b7280;
+  --borde: #e5e7eb;
+  --borde-suave: #eef0f3;
+  --acento: #2563eb;
+  --acento-oscuro: #1d4ed8;
+  --acento-suave: #eff4ff;
+  --peligro: #dc2626;
+  --peligro-suave: #fef2f2;
+  --ok: #15803d;
+  --ok-suave: #f0fdf4;
+  --aviso-suave: #fffbeb;
+  --radio: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
-  font-family: system-ui, sans-serif;
   margin: 0;
-  background: #f6f7f9;
+  background: var(--fondo);
+  color: var(--texto);
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
 }
-.login {
-  max-width: 360px;
-  margin: 4rem auto;
-  display: grid;
-  gap: 1rem;
-  padding: 1rem;
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: 650;
+  margin: 1rem 0 1.25rem;
+  letter-spacing: -0.01em;
 }
-.login input,
-.captura input,
-.captura select {
-  padding: 0.5rem;
-  font-size: 1rem;
-}
-label {
-  display: grid;
-  gap: 0.25rem;
+h2 {
+  font-size: 1.1rem;
   font-weight: 600;
+  margin: 0 0 0.75rem;
 }
-.captura {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: 1rem;
-}
-.captura header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.controles {
-  display: flex;
-  gap: 1rem;
-  flex-wrap: wrap;
-  margin: 1rem 0;
-}
-.fila {
-  display: flex;
-  gap: 0.5rem;
-}
-.fila-captura {
-  background: #fff;
-  padding: 1rem;
-  border-radius: 8px;
-  display: grid;
-  gap: 0.75rem;
-}
-.celdas {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-.celda {
-  display: grid;
-  gap: 0.15rem;
-  justify-items: center;
-  font-size: 0.8rem;
-  color: #555;
-}
-.celda input {
-  width: 2.6rem;
-  text-align: center;
-  font-size: 1.2rem;
-  text-transform: uppercase;
-  padding: 0.4rem 0;
-}
-.vista {
-  margin: 0;
-}
-.ayuda {
-  margin: 0;
-  font-size: 0.85rem;
-  color: #666;
-}
-.ok {
-  color: #15803d;
-}
-.error {
-  color: #b91c1c;
-}
-table {
-  border-collapse: collapse;
-  width: 100%;
-  background: #fff;
-}
-th,
-td {
-  border: 1px solid #ddd;
-  padding: 0.4rem 0.6rem;
-  text-align: left;
-}
-button {
-  padding: 0.6rem 1.2rem;
+h3 {
   font-size: 1rem;
-  cursor: pointer;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
 }
+p {
+  margin: 0.5rem 0;
+}
+
+section {
+  margin-bottom: 2rem;
+}
+
+/* ---------- Estructura ---------- */
+
+.captura {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 3rem;
+}
+
 .encabezado {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 0.5rem;
+  padding: 0.5rem 0 0.75rem;
+  border-bottom: 1px solid var(--borde);
 }
 .encabezado nav {
   display: flex;
-  gap: 1rem;
+  gap: 1.5rem;
 }
 .encabezado a {
+  color: var(--muted);
   text-decoration: none;
-  color: #555;
-  padding: 0.3rem 0.1rem;
+  font-weight: 500;
+  padding: 0.35rem 0;
+  border-bottom: 2px solid transparent;
+}
+.encabezado a:hover {
+  color: var(--texto);
 }
 .encabezado a.active {
-  color: #111;
-  font-weight: 700;
-  border-bottom: 2px solid #3b82f6;
+  color: var(--texto);
+  border-bottom-color: var(--acento);
 }
-.tabla-scroll {
-  overflow-x: auto;
-  margin-bottom: 1rem;
-}
-.excluido td {
-  color: #888;
-  background: #f3f3f3;
-}
-section {
-  margin-bottom: 1.5rem;
-}
-.buscador {
-  padding: 0.5rem;
-  font-size: 1rem;
-  margin-bottom: 0.75rem;
-  width: 100%;
-  max-width: 260px;
-  box-sizing: border-box;
-}
-.tabla-cargados th.l,
-.tabla-cargados td.l {
-  text-align: center;
-  padding: 0.4rem 0.35rem;
-  font-family: ui-monospace, monospace;
-}
-.tabla-cargados button {
-  padding: 0.3rem 0.7rem;
-  font-size: 0.85rem;
-}
-.paginacion {
+
+.controles {
   display: flex;
   gap: 1rem;
-  align-items: center;
-  justify-content: center;
-  margin: 0.5rem 0 1rem;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 1.25rem;
 }
-.editando {
-  background: #fef9c3;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  margin: 0;
-}
-.acciones-lista {
+
+.fila {
   display: flex;
   gap: 0.5rem;
   align-items: center;
   flex-wrap: wrap;
-  margin-bottom: 0.75rem;
 }
-.acciones-lista .buscador {
-  margin-bottom: 0;
+
+/* Tarjeta de captura */
+.fila-captura {
+  display: grid;
+  gap: 1rem;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
 }
-.acciones-fila {
-  white-space: nowrap;
-}
-.acciones-fila button + button {
-  margin-left: 0.4rem;
-}
-button.peligro {
-  background: #b91c1c;
-  color: #fff;
-  border: 0;
-  border-radius: 6px;
-}
-button.peligro:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+
+/* ---------- Formularios ---------- */
+
+label,
+.rotulo {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--muted);
 }
 .campo {
   display: grid;
-  gap: 0.25rem;
+  gap: 0.3rem;
 }
-.rotulo {
-  font-weight: 600;
+
+input:not([type="checkbox"]),
+select {
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
 }
+input:focus-visible,
+select:focus-visible {
+  outline: none;
+  border-color: var(--acento);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+input[readonly] {
+  background: #f3f4f6;
+  color: var(--muted);
+}
+input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--acento);
+  cursor: pointer;
+}
+
+/* ---------- Botones ---------- */
+
+button {
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  padding: 0.5rem 0.95rem;
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
+}
+button:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+button:focus-visible {
+  outline: 2px solid var(--acento);
+  outline-offset: 2px;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.primario,
+button[type="submit"] {
+  background: var(--acento);
+  border-color: var(--acento);
+  color: #fff;
+}
+button.primario:hover:not(:disabled),
+button[type="submit"]:hover:not(:disabled) {
+  background: var(--acento-oscuro);
+  border-color: var(--acento-oscuro);
+}
+
+button.peligro {
+  color: var(--peligro);
+  border-color: #fecaca;
+  background: var(--superficie);
+}
+button.peligro:hover:not(:disabled) {
+  background: var(--peligro-suave);
+}
+
+/* ---------- Login ---------- */
+
+.login-pagina {
+  min-height: 100vh;
+  min-height: 100dvh; /* en celulares descuenta la barra del navegador */
+  display: grid;
+  place-items: center;
+  padding: 1rem 1rem 8vh; /* el padding inferior lo sube un poco, se ve mejor centrado a la vista */
+}
+
+.login {
+  width: 100%;
+  max-width: 380px;
+  display: grid;
+  gap: 1rem;
+  padding: 1.75rem;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+}
+.login h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.25rem;
+  text-align: center;
+}
+.login button {
+  width: 100%;
+  padding: 0.65rem;
+}
+
+/* ---------- Selector de estudiante ---------- */
+
 .combo {
   position: relative;
   flex: 1;
@@ -199,47 +250,54 @@ button.peligro:disabled {
 }
 .combo input {
   width: 100%;
-  box-sizing: border-box;
 }
+
 .sugerencias {
   position: absolute;
   z-index: 10;
   top: 100%;
   left: 0;
   right: 0;
-  margin: 2px 0 0;
-  padding: 0;
+  margin: 4px 0 0;
+  padding: 0.25rem;
   list-style: none;
-  background: #fff;
-  border: 1px solid #ccc;
-  border-radius: 6px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
   max-height: 280px;
   overflow-y: auto;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.1);
 }
 .sugerencias li {
-  padding: 0.5rem 0.75rem;
-  cursor: pointer;
   display: flex;
   justify-content: space-between;
   gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
 }
 .sugerencias li.activa,
 .sugerencias li:hover {
-  background: #e0ecff;
+  background: var(--acento-suave);
 }
 .sugerencias li.vacia {
-  color: #777;
+  color: var(--muted);
   cursor: default;
+  background: none;
 }
+
 .tag {
-  font-size: 0.75rem;
-  background: #dcfce7;
-  color: #166534;
-  padding: 0.1rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--ok);
+  background: var(--ok-suave);
+  border: 1px solid #bbf7d0;
+  padding: 0.05rem 0.5rem;
   border-radius: 999px;
   white-space: nowrap;
+  align-self: center;
 }
+
 .estudiante-sel {
   display: flex;
   justify-content: space-between;
@@ -247,17 +305,308 @@ button.peligro:disabled {
   gap: 1rem;
   flex-wrap: wrap;
 }
+.estudiante-sel strong {
+  font-size: 1.15rem;
+  font-weight: 650;
+}
 .codigo-auto {
   margin-top: 0.5rem;
 }
 .codigo-auto input {
-  background: #f3f4f6;
   width: 10rem;
 }
+
 .form-estudiante {
   display: grid;
-  gap: 0.75rem;
+  gap: 0.85rem;
+  max-width: 420px;
 }
 .form-estudiante h3 {
   margin: 0;
+}
+
+/* ---------- Casillas de respuestas ---------- */
+
+.celdas {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.celda {
+  display: grid;
+  gap: 0.2rem;
+  justify-items: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+.celda input {
+  width: 2.9rem;
+  height: 2.9rem;
+  padding: 0;
+  text-align: center;
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.vista {
+  margin: 0;
+  padding: 0.65rem 0.9rem;
+  background: var(--acento-suave);
+  border-radius: 8px;
+  font-size: 0.92rem;
+}
+
+.ayuda {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* ---------- Mensajes ---------- */
+
+.ok,
+.error,
+.editando {
+  padding: 0.6rem 0.9rem;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  margin: 0.75rem 0;
+}
+.ok {
+  color: var(--ok);
+  background: var(--ok-suave);
+  border: 1px solid #bbf7d0;
+}
+.error {
+  color: var(--peligro);
+  background: var(--peligro-suave);
+  border: 1px solid #fecaca;
+}
+.editando {
+  color: #92400e;
+  background: var(--aviso-suave);
+  border: 1px solid #fde68a;
+}
+
+/* ---------- Tablas ---------- */
+
+table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  overflow: hidden;
+  font-size: 0.92rem;
+}
+th,
+td {
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--borde-suave);
+}
+thead th {
+  background: #f9fafb;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--borde);
+}
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+tbody tr:hover td {
+  background: #fafbff;
+}
+
+.excluido td {
+  color: var(--muted);
+  background: #fafafa;
+}
+
+.tabla-scroll {
+  overflow-x: auto;
+  margin-bottom: 1rem;
+  border-radius: var(--radio);
+}
+.tabla-scroll table {
+  margin: 0;
+}
+
+.tabla-cargados th,
+.tabla-cargados td {
+  padding: 0.4rem 0.5rem;
+  white-space: nowrap;
+}
+.tabla-cargados th.l,
+.tabla-cargados td.l {
+  text-align: center;
+  padding: 0.4rem 0.3rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+}
+.tabla-cargados button {
+  padding: 0.25rem 0.65rem;
+  font-size: 0.8rem;
+}
+
+.acciones-lista {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.buscador {
+  width: 100%;
+  max-width: 280px;
+}
+.acciones-fila {
+  white-space: nowrap;
+}
+.acciones-fila button + button {
+  margin-left: 0.35rem;
+}
+
+.paginacion {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+/* ---------- Pantallas pequeñas ---------- */
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+@media (max-width: 640px) {
+  h1 {
+    font-size: 1.3rem;
+    margin: 0.75rem 0 1rem;
+  }
+  .captura {
+    padding: 0.5rem 0.75rem 2rem;
+  }
+  .fila-captura {
+    padding: 1rem;
+  }
+  .encabezado nav {
+    gap: 1rem;
+  }
+
+  /* iPhone hace zoom al enfocar campos con letra menor a 16px */
+  input:not([type="checkbox"]),
+  select {
+    font-size: 16px;
+  }
+
+  /* Botones y opciones más fáciles de tocar */
+  button {
+    min-height: 44px;
+  }
+  .tabla-cargados button {
+    min-height: 34px;
+  }
+  .sugerencias li {
+    padding: 0.75rem 0.65rem;
+  }
+
+  /* Controles a todo el ancho */
+  .controles {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  .controles select,
+  .controles button {
+    width: 100%;
+  }
+  .combo {
+    min-width: 100%;
+  }
+  .campo > .fila > button {
+    width: 100%;
+  }
+  .buscador {
+    max-width: none;
+  }
+  .estudiante-sel > .fila {
+    width: 100%;
+  }
+  .estudiante-sel > .fila button,
+  .form-estudiante .fila button {
+    flex: 1;
+  }
+
+  /* Casillas de respuestas: 5 por fila, anchas para tocarlas bien */
+  .celdas {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.5rem;
+  }
+  .celda {
+    justify-items: stretch;
+  }
+  .celda input {
+    width: 100%;
+    height: 3rem;
+  }
+
+  /* Tablas más compactas */
+  th,
+  td {
+    padding: 0.5rem 0.6rem;
+  }
+
+  .paginacion {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* Login con margen a los lados */
+  .login {
+    padding: 1.25rem;
+  }
+}
+.cargando {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem 1rem;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+.cargando-pagina {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 0;
+}
+.spinner {
+  width: 1.4rem;
+  height: 1.4rem;
+  border: 2px solid var(--borde);
+  border-top-color: var(--acento);
+  border-radius: 50%;
+  animation: girar 0.7s linear infinite;
+}
+@keyframes girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2s;
+  }
 }

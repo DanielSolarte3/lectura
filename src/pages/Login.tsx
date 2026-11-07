@@ -23,34 +23,36 @@ export default function Login() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="login">
-      <h1>Ingreso de profesores</h1>
-      <label>
-        Usuario (correo)
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-      </label>
-      <label>
-        Contraseña
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-      </label>
-      {error && (
-        <p role="alert" className="error">
-          {error}
-        </p>
-      )}
-      <button type="submit" disabled={cargando}>
-        {cargando ? "Entrando…" : "Entrar"}
-      </button>
-    </form>
+    <div className="login-pagina">
+      <form onSubmit={onSubmit} className="login">
+        <h1>Iniciar sesión</h1>
+        <label>
+          Usuario (correo)
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+        </label>
+        <label>
+          Contraseña
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </label>
+        {error && (
+          <p role="alert" className="error">
+            {error}
+          </p>
+        )}
+        <button type="submit" disabled={cargando}>
+          {cargando ? "Entrando…" : "Entrar"}
+        </button>
+      </form>
+    </div>
   );
 }

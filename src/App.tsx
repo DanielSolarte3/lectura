@@ -4,10 +4,11 @@ import { useSesion } from "./lib/useSesion";
 import Login from "./pages/Login";
 import Captura from "./pages/Captura";
 import Resultados from "./pages/Resultados";
+import Cargando from "./components/Cargando";
 
 function Protegida({ children }: { children: ReactNode }) {
   const { sesion, cargando } = useSesion();
-  if (cargando) return <p>Cargando…</p>;
+  if (cargando) return <Cargando pagina />;
   return sesion ? <>{children}</> : <Navigate to="/login" replace />;
 }
 

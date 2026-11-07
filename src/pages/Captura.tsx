@@ -23,6 +23,7 @@ import {
   type Estudiante,
   type ErrorEstudiante,
 } from "../lib/captura";
+import Cargando from "../components/Cargando";
 
 const CODIGO_REGEX = /^[A-Z0-9]+(-[A-Z0-9]+)*$/;
 const TAM_PAGINA = 25;
@@ -120,6 +121,7 @@ export default function Captura() {
     setPagina(0);
     setSeleccion(new Set());
     setMensaje(null);
+    setEnfocado(false);
 
     Promise.all([
       listarPreguntasDeExamen(examenId),
@@ -189,6 +191,7 @@ export default function Captura() {
   // ---------- Selección y edición de estudiantes ----------
 
   function elegir(est: Estudiante) {
+    setEnfocado(false);
     const previo = intentoDe.get(est.codigo);
     setSeleccionado(est);
     setResp(
@@ -207,7 +210,6 @@ export default function Captura() {
     setResp(Array(preguntas.length).fill(null));
     setBusqueda("");
     setResaltado(0);
-    setTimeout(() => buscadorRef.current?.focus(), 0);
   }
 
   function teclaBuscador(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -225,6 +227,7 @@ export default function Captura() {
   }
 
   function abrirNuevo() {
+    setEnfocado(false);
     setFormulario({
       modo: "nuevo",
       nombre: busqueda.trim(),
@@ -491,7 +494,14 @@ export default function Captura() {
 
   if (errorCarga)
     return <p>No se pudo cargar la información. Recarga la página.</p>;
-  if (examenId === null) return <p>Cargando…</p>;
+  if (examenId === null) {
+    return (
+      <div className="captura">
+        <Encabezado />
+        <Cargando />
+      </div>
+    );
+  }
 
   return (
     <div className="captura">
@@ -516,7 +526,7 @@ export default function Captura() {
       </div>
 
       {cargandoLista ? (
-        <p>Cargando examen…</p>
+        <Cargando texto="Cargando examen…" />
       ) : preguntas.length === 0 ? (
         <p className="error">
           Este examen no tiene preguntas asociadas (revisa la tabla
@@ -619,6 +629,9 @@ export default function Captura() {
                       onKeyDown={(e) => teclaCelda(i, e)}
                       onFocus={(e) => e.target.select()}
                       autoComplete="off"
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
                       aria-label={`Pregunta ${p.numero}`}
                     />
                   </div>
@@ -635,7 +648,12 @@ export default function Captura() {
                 </strong>
               </p>
 
-              <button type="button" onClick={guardar} disabled={guardando}>
+              <button
+                type="button"
+                className="primario"
+                onClick={guardar}
+                disabled={guardando}
+              >
                 {guardando ? "Guardando…" : "Guardar (Enter)"}
               </button>
               <p className="ayuda">
@@ -661,7 +679,6 @@ export default function Captura() {
                     placeholder="Escribe el nombre…"
                     aria-label="Buscar estudiante por nombre"
                     autoComplete="off"
-                    autoFocus
                   />
                   {enfocado && (
                     <ul className="sugerencias">
