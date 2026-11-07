@@ -676,7 +676,7 @@ export default function Captura() {
                         >
                           <span>{e.nombre}</span>
                           {intentoDe.has(e.codigo) && (
-                            <span className="tag">ya cargado</span>
+                            <span className="tag">Ya cargado</span>
                           )}
                         </li>
                       ))}
