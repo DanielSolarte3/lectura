@@ -73,9 +73,9 @@ export default function Resultados() {
   const nombreExamen = (id: number | null) =>
     examenes.find((e) => e.id === id)?.nombre ?? "—";
 
-  function exportar() {
+  async function exportar() {
     const fecha = new Date().toISOString().slice(0, 10);
-    exportarExcel(
+    await exportarExcel(
       filas,
       [
         { examen: nombreExamen(preId), preguntas: sumasPre },

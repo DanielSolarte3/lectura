@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import {
   ETIQUETA,
   CAMBIO,
@@ -7,11 +6,12 @@ import {
   type SumaPregunta,
 } from "./analisis";
 
-export function exportarExcel(
+export async function exportarExcel(
   filas: FilaEstudiante[],
   sumas: { examen: string; preguntas: SumaPregunta[] }[],
   nombreArchivo: string,
 ) {
+  const XLSX = await import("xlsx");
   const resultados = filas.map((f) => ({
     Estudiante: f.codigo,
     "Pre A": f.pre?.literal ?? "",
