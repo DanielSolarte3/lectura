@@ -610,3 +610,7 @@ html {
     animation-duration: 2s;
   }
 }
+
+.tabla-cargados td {
+  font-variant-numeric: tabular-nums;
+}

@@ -26,7 +26,7 @@ import {
 import Cargando from "../components/Cargando";
 
 const CODIGO_REGEX = /^[A-Z0-9]+(-[A-Z0-9]+)*$/;
-const TAM_PAGINA = 25;
+const TAM_PAGINA = 50;
 const MAX_SUGERENCIAS = 50;
 const ETIQUETA: Record<Nivel, string> = {
   literal: "Literal",
@@ -777,9 +777,7 @@ export default function Captura() {
                           {p.numero}
                         </th>
                       ))}
-                      <th>A</th>
-                      <th>B</th>
-                      <th>C</th>
+                      <th>A-B-C</th>
                       <th>Resp.</th>
                       <th>Nivel</th>
                       <th>Cargado</th>
@@ -816,9 +814,7 @@ export default function Captura() {
                               {l ?? "·"}
                             </td>
                           ))}
-                          <td>{literal}</td>
-                          <td>{inferencial}</td>
-                          <td>{critico}</td>
+                          <td>{`${literal}-${inferencial}-${critico}`}</td>
                           <td>{total}</td>
                           <td>{nivel ? ETIQUETA[nivel] : "Excluido"}</td>
                           <td>
