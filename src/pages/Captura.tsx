@@ -10,15 +10,12 @@ import {
 import {
   listarExamenes,
   listarPreguntasDeExamen,
-  listarGrupos,
-  crearGrupo,
   existeIntento,
   registrarRespuestas,
   listarIntentosDeExamen,
   cargarIntento,
   eliminarIntentos,
   type ExamenResumen,
-  type Grupo,
   type PreguntaExamen,
   type IntentoCargado,
 } from "../lib/captura";
