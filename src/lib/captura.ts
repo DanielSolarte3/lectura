@@ -79,13 +79,11 @@ export async function registrarRespuestas(
   codigo: string,
   examenId: number,
   respuestas: Record<number, Opcion>, // id de pregunta → opción; las no contestadas se omiten
-  grupoId: number | null,
 ): Promise<ErrorRegistro | null> {
   const { error } = await supabase.rpc("registrar_respuestas", {
     p_codigo: codigo,
     p_examen_id: examenId,
     p_respuestas: respuestas,
-    p_grupo_id: grupoId,
   });
   if (!error) return null;
   if (error.code === "23514") return "codigo_invalido"; // check del formato del código

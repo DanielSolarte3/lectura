@@ -14,7 +14,6 @@ export function exportarExcel(
 ) {
   const resultados = filas.map((f) => ({
     Estudiante: f.codigo,
-    Grupo: f.grupo ?? "",
     "Pre A": f.pre?.literal ?? "",
     "Pre B": f.pre?.inferencial ?? "",
     "Pre C": f.pre?.critico ?? "",

@@ -208,7 +208,6 @@ export default function Resultados() {
             <thead>
               <tr>
                 <th>Código</th>
-                <th>Grupo</th>
                 <th>Pre (A-B-C)</th>
                 <th>Pre nivel</th>
                 <th>Post (A-B-C)</th>
@@ -221,7 +220,6 @@ export default function Resultados() {
               {filas.map((f) => (
                 <tr key={f.codigo} className={f.incluido ? "" : "excluido"}>
                   <td>{f.codigo}</td>
-                  <td>{f.grupo ?? "—"}</td>
                   <td>{conteo(f.pre)}</td>
                   <td>{f.pre?.nivel ? ETIQUETA[f.pre.nivel] : "—"}</td>
                   <td>{conteo(f.post)}</td>

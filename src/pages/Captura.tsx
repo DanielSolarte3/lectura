@@ -11,19 +11,17 @@ import {
   listarExamenes,
   listarPreguntasDeExamen,
   listarGrupos,
-  crearGrupo,
   existeIntento,
   registrarRespuestas,
   listarIntentosDeExamen,
   cargarIntento,
   type ExamenResumen,
-  type Grupo,
   type PreguntaExamen,
   type IntentoCargado,
 } from "../lib/captura";
 
 const CODIGO_REGEX = /^[A-Z0-9]+(-[A-Z0-9]+)*$/;
-const TAM_PAGINA = 25;
+const TAM_PAGINA = 50;
 const ETIQUETA: Record<Nivel, string> = {
   literal: "Literal",
   inferencial: "Inferencial",
@@ -32,9 +30,7 @@ const ETIQUETA: Record<Nivel, string> = {
 
 export default function Captura() {
   const [examenes, setExamenes] = useState<ExamenResumen[]>([]);
-  const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [examenId, setExamenId] = useState<number | null>(null);
-  const [grupoId, setGrupoId] = useState<number | null>(null);
   const [preguntas, setPreguntas] = useState<PreguntaExamen[]>([]);
   const [intentos, setIntentos] = useState<IntentoCargado[]>([]);
   const [cargandoLista, setCargandoLista] = useState(true);
@@ -59,7 +55,6 @@ export default function Captura() {
     Promise.all([listarExamenes(), listarGrupos()])
       .then(([ex, gr]) => {
         setExamenes(ex);
-        setGrupos(gr);
         const inicial = ex.find((e) => e.tipo === "pre" && e.activo) ?? ex[0];
         if (inicial) setExamenId(inicial.id);
       })
@@ -157,20 +152,6 @@ export default function Captura() {
     }
   }
 
-  async function nuevoGrupo() {
-    const nombre = prompt("Nombre del nuevo grupo")?.trim();
-    if (!nombre) return;
-    try {
-      const g = await crearGrupo(nombre);
-      setGrupos((gs) =>
-        [...gs, g].sort((a, b) => a.nombre.localeCompare(b.nombre)),
-      );
-      setGrupoId(g.id);
-    } catch {
-      alert("No se pudo crear el grupo (¿ya existe uno con ese nombre?).");
-    }
-  }
-
   function editar(intento: IntentoCargado, letras: (Opcion | null)[]) {
     setCodigo(intento.codigo);
     setResp(letras);
@@ -230,12 +211,10 @@ export default function Captura() {
         if (r) payload[p.pregunta_id] = r;
       });
 
-      // Al editar se conserva el grupo que el estudiante ya tiene
       const fallo = await registrarRespuestas(
         cod,
         examenId,
-        payload,
-        esEdicion ? null : grupoId,
+        payload
       );
       if (fallo) {
         return setMensaje({
@@ -295,28 +274,6 @@ export default function Captura() {
               </option>
             ))}
           </select>
-        </label>
-
-        <label>
-          Grupo (opcional)
-          <span className="fila">
-            <select
-              value={grupoId ?? ""}
-              onChange={(e) =>
-                setGrupoId(e.target.value ? Number(e.target.value) : null)
-              }
-            >
-              <option value="">Sin grupo</option>
-              {grupos.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.nombre}
-                </option>
-              ))}
-            </select>
-            <button type="button" onClick={nuevoGrupo}>
-              + Nuevo
-            </button>
-          </span>
         </label>
       </div>
 
@@ -429,7 +386,7 @@ export default function Captura() {
                   <thead>
                     <tr>
                       <th>Código</th>
-                      <th>Grupo</th>
+
                       {preguntas.map((p) => (
                         <th key={p.pregunta_id} className="l">
                           {p.numero}
@@ -460,7 +417,6 @@ export default function Captura() {
                           className={nivel ? "" : "excluido"}
                         >
                           <td>{intento.codigo}</td>
-                          <td>{intento.grupo ?? "—"}</td>
                           {letras.map((l, i) => (
                             <td key={i} className="l">
                               {l ?? "·"}
