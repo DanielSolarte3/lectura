@@ -174,7 +174,42 @@ export async function cargarIntento(
   return data ? aIntento(data as unknown as IntentoCrudo) : null;
 }
 
+function errorEliminar(error: { code?: string; message: string }): Error {
+  return new Error(error.code === "42501" ? "sin_permiso" : error.message);
+}
+
 export async function eliminarIntentos(ids: number[]): Promise<void> {
   const { error } = await supabase.rpc("eliminar_intentos", { p_ids: ids });
-  if (error) throw error;
+  if (error) throw errorEliminar(error);
+}
+
+export async function eliminarEstudiantes(codigos: string[]): Promise<void> {
+  const { error } = await supabase.rpc("eliminar_estudiantes", {
+    p_codigos: codigos,
+  });
+  if (error) throw errorEliminar(error);
+}
+
+export async function listarPruebasPorEstudiante(): Promise<
+  Record<string, ("pre" | "post")[]>
+> {
+  const filas = await traerTodo<{
+    estudiante_codigo: string;
+    examenes: { tipo: "pre" | "post" } | null;
+  }>((desde, hasta) =>
+    supabase
+      .from("intentos")
+      .select("estudiante_codigo, examenes ( tipo )")
+      .order("id")
+      .range(desde, hasta),
+  );
+
+  const mapa: Record<string, ("pre" | "post")[]> = {};
+  for (const f of filas) {
+    const tipo = f.examenes?.tipo;
+    if (!tipo) continue;
+    const lista = (mapa[f.estudiante_codigo] ??= []);
+    if (!lista.includes(tipo)) lista.push(tipo);
+  }
+  return mapa;
 }

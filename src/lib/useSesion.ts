@@ -19,3 +19,7 @@ export function useSesion() {
 
   return { sesion, cargando };
 }
+export function useEsAdmin() {
+  const { sesion } = useSesion();
+  return sesion?.user.app_metadata?.rol === "admin";
+}
