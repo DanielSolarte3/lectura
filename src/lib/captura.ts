@@ -68,13 +68,13 @@ export async function crearEstudiante(
   codigo: string,
   nombre: string,
 ): Promise<ResultadoEstudiante> {
-  const { data, error } = await supabase
-    .from("estudiantes")
-    .insert({ codigo, nombre })
-    .select("codigo, nombre")
-    .single();
+  const { data, error } = await supabase.rpc("crear_estudiante", {
+    p_codigo: codigo,
+    p_nombre: nombre,
+  });
   if (error) return { estudiante: null, error: mapearError(error.code) };
-  return { estudiante: data, error: null };
+  const e = data as Estudiante;
+  return { estudiante: { codigo: e.codigo, nombre: e.nombre }, error: null };
 }
 
 export async function actualizarEstudiante(
@@ -82,14 +82,14 @@ export async function actualizarEstudiante(
   codigo: string,
   nombre: string,
 ): Promise<ResultadoEstudiante> {
-  const { data, error } = await supabase
-    .from("estudiantes")
-    .update({ codigo, nombre })
-    .eq("codigo", codigoActual)
-    .select("codigo, nombre")
-    .single();
+  const { data, error } = await supabase.rpc("actualizar_estudiante", {
+    p_codigo_actual: codigoActual,
+    p_codigo: codigo,
+    p_nombre: nombre,
+  });
   if (error) return { estudiante: null, error: mapearError(error.code) };
-  return { estudiante: data, error: null };
+  const e = data as Estudiante;
+  return { estudiante: { codigo: e.codigo, nombre: e.nombre }, error: null };
 }
 
 // ---------- Respuestas ----------

@@ -5,10 +5,21 @@ import {
   listarEstudiantes,
   listarPruebasPorEstudiante,
   eliminarEstudiantes,
+  actualizarEstudiante,
+  crearEstudiante,
   type Estudiante,
+  type ErrorEstudiante,
 } from "../lib/captura";
 
 const TAM_PAGINA = 100;
+const CODIGO_REGEX = /^[A-Z0-9]+(-[A-Z0-9]+)*$/;
+const MENSAJE_ERROR: Record<ErrorEstudiante, string> = {
+  codigo_repetido: "Ya existe un estudiante con ese código.",
+  formato_invalido:
+    "El código solo puede tener letras, números y guiones (ej. INC-1), y el nombre no puede quedar vacío.",
+  desconocido:
+    "No se pudo guardar el cambio. Revisa la conexión e intenta de nuevo.",
+};
 
 // Para buscar sin importar mayúsculas ni tildes
 const normalizar = (s: string) =>
@@ -27,38 +38,46 @@ const numeroDelCodigo = (codigo: string) => {
 };
 
 const COMPARADORES: Record<Orden, (a: Estudiante, b: Estudiante) => number> = {
-
-  // 2. Código, orden numérico por el número después del guion: 1, 2, 3… 10, 11
   numero: (a, b) => {
     const na = numeroDelCodigo(a.codigo);
     const nb = numeroDelCodigo(b.codigo);
     if (na !== nb) return na < nb ? -1 : 1;
-    return a.codigo.localeCompare(b.codigo, "es"); // mismo número: por código
+    return a.codigo.localeCompare(b.codigo, "es");
   },
-
-  // 3. Nombre, orden alfabético
   nombre: (a, b) =>
     a.nombre.localeCompare(b.nombre, "es") ||
     a.codigo.localeCompare(b.codigo, "es"),
 };
+
+interface Edicion {
+  original: string;
+  nombre: string;
+  codigo: string;
+}
 
 export default function Estudiantes() {
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
   const [pruebas, setPruebas] = useState<Record<string, ("pre" | "post")[]>>(
     {},
   );
-  const [orden, setOrden] = useState<Orden>("nombre");
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(false);
 
   const [busqueda, setBusqueda] = useState("");
+  const [orden, setOrden] = useState<Orden>("nombre");
   const [pagina, setPagina] = useState(0);
   const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+  const [edicion, setEdicion] = useState<Edicion | null>(null);
+  const [guardando, setGuardando] = useState(false);
   const [eliminando, setEliminando] = useState(false);
   const [mensaje, setMensaje] = useState<{
     tipo: "ok" | "error";
     texto: string;
   } | null>(null);
+  const [nuevo, setNuevo] = useState<{ nombre: string; codigo: string } | null>(
+    null,
+  );
+  const [guardandoNuevo, setGuardandoNuevo] = useState(false);
 
   useEffect(() => {
     Promise.all([listarEstudiantes(), listarPruebasPorEstudiante()])
@@ -88,6 +107,8 @@ export default function Estudiantes() {
     codigosVisibles.length > 0 &&
     codigosVisibles.every((c) => seleccion.has(c));
 
+  // ---------- Selección ----------
+
   function alternar(codigo: string) {
     setSeleccion((s) => {
       const n = new Set(s);
@@ -107,6 +128,156 @@ export default function Estudiantes() {
       return n;
     });
   }
+
+  // ---------- Edición ----------
+
+  function abrirEdicion(e: Estudiante) {
+    setEdicion({ original: e.codigo, nombre: e.nombre, codigo: e.codigo });
+    setMensaje(null);
+  }
+
+  function teclaEdicion(ev: React.KeyboardEvent<HTMLInputElement>) {
+    if (ev.key === "Enter") {
+      ev.preventDefault();
+      guardarEdicion();
+    } else if (ev.key === "Escape") {
+      setEdicion(null);
+    }
+  }
+
+  async function guardarEdicion() {
+    if (!edicion || guardando) return;
+
+    const original = edicion.original;
+    const nombre = edicion.nombre.trim().replace(/\s+/g, " ");
+    const codigo = edicion.codigo.trim().toUpperCase();
+
+    if (!nombre) {
+      return setMensaje({
+        tipo: "error",
+        texto: "El nombre no puede quedar vacío.",
+      });
+    }
+    if (!CODIGO_REGEX.test(codigo)) {
+      return setMensaje({
+        tipo: "error",
+        texto: MENSAJE_ERROR.formato_invalido,
+      });
+    }
+
+    const actual = estudiantes.find((e) => e.codigo === original);
+    if (actual && actual.nombre === nombre && actual.codigo === codigo) {
+      setEdicion(null); // no hubo cambios
+      return;
+    }
+
+    const homonimo = estudiantes.find(
+      (e) =>
+        e.codigo !== original && normalizar(e.nombre) === normalizar(nombre),
+    );
+    if (
+      homonimo &&
+      !confirm(
+        `Ya existe un estudiante llamado "${homonimo.nombre}" (código ${homonimo.codigo}). ¿Guardar de todas formas?`,
+      )
+    )
+      return;
+
+    if (
+      codigo !== original &&
+      !confirm(
+        `Vas a cambiar el código de ${original} a ${codigo}. Sus respuestas ya cargadas pasarán al código nuevo. ¿Continuar?`,
+      )
+    )
+      return;
+
+    setMensaje(null);
+    setGuardando(true);
+    const r = await actualizarEstudiante(original, codigo, nombre);
+    setGuardando(false);
+
+    if (r.estudiante === null) {
+      return setMensaje({ tipo: "error", texto: MENSAJE_ERROR[r.error] });
+    }
+
+    const nuevo = r.estudiante;
+    setEstudiantes((prev) =>
+      prev.map((e) => (e.codigo === original ? nuevo : e)),
+    );
+
+    if (nuevo.codigo !== original) {
+      setPruebas((prev) => {
+        if (!prev[original]) return prev;
+        const { [original]: movidas, ...resto } = prev;
+        return { ...resto, [nuevo.codigo]: movidas };
+      });
+      setSeleccion((prev) => {
+        if (!prev.has(original)) return prev;
+        const n = new Set(prev);
+        n.delete(original);
+        n.add(nuevo.codigo);
+        return n;
+      });
+    }
+
+    setEdicion(null);
+    setMensaje({ tipo: "ok", texto: "Datos del estudiante actualizados." });
+  }
+
+  // ---------- Creacion ----------
+
+  function abrirNuevo() {
+    setNuevo({ nombre: busqueda.trim(), codigo: "" }); // si ya escribiste un nombre en el buscador, lo reutiliza
+    setMensaje(null);
+  }
+
+  async function guardarNuevo() {
+    if (!nuevo || guardandoNuevo) return;
+
+    const nombre = nuevo.nombre.trim().replace(/\s+/g, " ");
+    const codigo = nuevo.codigo.trim().toUpperCase();
+
+    if (!nombre) {
+      return setMensaje({
+        tipo: "error",
+        texto: "Escribe el nombre del estudiante.",
+      });
+    }
+    if (!CODIGO_REGEX.test(codigo)) {
+      return setMensaje({
+        tipo: "error",
+        texto: MENSAJE_ERROR.formato_invalido,
+      });
+    }
+
+    const homonimo = estudiantes.find(
+      (e) => normalizar(e.nombre) === normalizar(nombre),
+    );
+    if (
+      homonimo &&
+      !confirm(
+        `Ya existe un estudiante llamado "${homonimo.nombre}" (código ${homonimo.codigo}). ¿Guardar de todas formas?`,
+      )
+    )
+      return;
+
+    setMensaje(null);
+    setGuardandoNuevo(true);
+    const r = await crearEstudiante(codigo, nombre);
+    setGuardandoNuevo(false);
+
+    if (r.estudiante === null) {
+      return setMensaje({ tipo: "error", texto: MENSAJE_ERROR[r.error] });
+    }
+
+    const est = r.estudiante;
+    setEstudiantes((prev) => [...prev, est]);
+    setNuevo(null);
+    setPagina(0);
+    setMensaje({ tipo: "ok", texto: `${est.nombre} agregado.` });
+  }
+
+  // ---------- Eliminación ----------
 
   async function eliminar(codigos: string[]) {
     if (codigos.length === 0 || eliminando) return;
@@ -140,6 +311,7 @@ export default function Estudiantes() {
         codigos.forEach((c) => n.delete(c));
         return n;
       });
+      if (edicion && codigos.includes(edicion.original)) setEdicion(null);
       setMensaje({
         tipo: "ok",
         texto:
@@ -204,9 +376,12 @@ export default function Estudiantes() {
           }}
           aria-label="Ordenar por"
         >
-          <option value="nombre">Orden: por nombre (A-Z)</option>
-          <option value="numero">Orden: por código (número)</option>
+          <option value="nombre">Orden: nombre (A-Z)</option>
+          <option value="numero">Orden: código (número)</option>
         </select>
+        <button type="button" className="primario" onClick={abrirNuevo}>
+          + Nuevo estudiante
+        </button>
         {seleccion.size > 0 && (
           <>
             <button
@@ -223,7 +398,45 @@ export default function Estudiantes() {
           </>
         )}
       </div>
-
+      {nuevo && (
+        <form
+          className="fila-captura form-estudiante"
+          onSubmit={(e) => {
+            e.preventDefault();
+            guardarNuevo();
+          }}
+        >
+          <h3>Nuevo estudiante</h3>
+          <label>
+            Nombre completo
+            <input
+              value={nuevo.nombre}
+              onChange={(e) => setNuevo({ ...nuevo, nombre: e.target.value })}
+              autoComplete="off"
+              autoFocus
+            />
+          </label>
+          <label>
+            Código
+            <input
+              value={nuevo.codigo}
+              onChange={(e) =>
+                setNuevo({ ...nuevo, codigo: e.target.value.toUpperCase() })
+              }
+              placeholder="INC-1"
+              autoComplete="off"
+            />
+          </label>
+          <div className="fila">
+            <button type="submit" disabled={guardandoNuevo}>
+              {guardandoNuevo ? "Guardando…" : "Guardar estudiante"}
+            </button>
+            <button type="button" onClick={() => setNuevo(null)}>
+              Cancelar
+            </button>
+          </div>
+        </form>
+      )}
       {mensaje && (
         <p role="alert" className={mensaje.tipo === "ok" ? "ok" : "error"}>
           {mensaje.texto}
@@ -261,6 +474,9 @@ export default function Estudiantes() {
                   const cargadas = [...(pruebas[e.codigo] ?? [])]
                     .sort()
                     .reverse(); // "pre" antes que "post"
+                  const ed =
+                    edicion && edicion.original === e.codigo ? edicion : null;
+
                   return (
                     <tr key={e.codigo}>
                       <td>
@@ -271,8 +487,43 @@ export default function Estudiantes() {
                           aria-label={`Seleccionar ${e.nombre}`}
                         />
                       </td>
-                      <td>{e.codigo}</td>
-                      <td>{e.nombre}</td>
+
+                      {ed ? (
+                        <>
+                          <td>
+                            <input
+                              value={ed.nombre}
+                              onChange={(ev) =>
+                                setEdicion({ ...ed, nombre: ev.target.value })
+                              }
+                              onKeyDown={teclaEdicion}
+                              aria-label="Nombre del estudiante"
+                              autoComplete="off"
+                              autoFocus
+                            />
+                          </td>
+                          <td>
+                            <input
+                              value={ed.codigo}
+                              onChange={(ev) =>
+                                setEdicion({
+                                  ...ed,
+                                  codigo: ev.target.value.toUpperCase(),
+                                })
+                              }
+                              onKeyDown={teclaEdicion}
+                              aria-label="Código del estudiante"
+                              autoComplete="off"
+                            />
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td>{e.codigo}</td>
+                          <td>{e.nombre}</td>
+                        </>
+                      )}
+
                       <td>
                         {cargadas.length === 0
                           ? "—"
@@ -282,15 +533,73 @@ export default function Estudiantes() {
                               </span>
                             ))}
                       </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="peligro"
-                          onClick={() => eliminar([e.codigo])}
-                          disabled={eliminando}
-                        >
-                          Eliminar
-                        </button>
+
+                      <td className="acciones-fila">
+                        {ed ? (
+                          <>
+                            <button
+                              type="button"
+                              className="primario"
+                              onClick={guardarEdicion}
+                              disabled={guardando}
+                            >
+                              {guardando ? "Guardando…" : "Guardar"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEdicion(null)}
+                              disabled={guardando}
+                            >
+                              Cancelar
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => abrirEdicion(e)}
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M12 20h9" />
+                                <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L8 18l-4 1 1-4Z" />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              className="peligro"
+                              onClick={() => eliminar([e.codigo])}
+                              disabled={eliminando}
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="20"
+                                height="20"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <path d="M3 6h18" />
+                                <path d="M8 6V4h8v2" />
+                                <path d="M19 6l-1 14H6L5 6" />
+                                <path d="M10 11v5" />
+                                <path d="M14 11v5" />
+                              </svg>
+                            </button>
+                          </>
+                        )}
                       </td>
                     </tr>
                   );

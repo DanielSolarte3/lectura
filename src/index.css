@@ -1,6 +1,6 @@
 :root {
   color-scheme: light;
-  --fondo: #f7f8fa;
+  --fondo: #f0f1f4;
   --superficie: #ffffff;
   --texto: #1f2937;
   --muted: #6b7280;
@@ -324,6 +324,9 @@ button.peligro:hover:not(:disabled) {
 .form-estudiante h3 {
   margin: 0;
 }
+.form-estudiante.fila-captura {
+  margin-bottom: 1.25rem;
+}
 
 /* ---------- Casillas de respuestas ---------- */
 
@@ -486,6 +489,13 @@ tbody tr:hover td {
 
 html {
   -webkit-text-size-adjust: 100%;
+}
+
+.tabla-cargados td:nth-child(3) {
+  font-size: 0.82rem;
+  white-space: normal; /* permite saltar de línea */
+  min-width: 9rem; /* que no se aplaste demasiado */
+  max-width: 14rem; /* y que nunca ocupe más que esto */
 }
 
 @media (max-width: 640px) {

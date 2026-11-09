@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Encabezado from "../components/Encabezado";
+import Cargando from "../components/Cargando";
 import {
   clasificar,
   contar,
@@ -11,8 +12,6 @@ import {
   listarExamenes,
   listarPreguntasDeExamen,
   listarEstudiantes,
-  crearEstudiante,
-  actualizarEstudiante,
   registrarRespuestas,
   listarIntentosDeExamen,
   cargarIntento,
@@ -21,24 +20,14 @@ import {
   type PreguntaExamen,
   type IntentoCargado,
   type Estudiante,
-  type ErrorEstudiante,
 } from "../lib/captura";
-import Cargando from "../components/Cargando";
 
-const CODIGO_REGEX = /^[A-Z0-9]+(-[A-Z0-9]+)*$/;
 const TAM_PAGINA = 50;
 const MAX_SUGERENCIAS = 50;
 const ETIQUETA: Record<Nivel, string> = {
   literal: "Literal",
   inferencial: "Inferencial",
   critico: "Crítico",
-};
-const MENSAJE_ERROR_ESTUDIANTE: Record<ErrorEstudiante, string> = {
-  codigo_repetido: "Ya existe un estudiante con ese código.",
-  formato_invalido:
-    "El código solo puede tener letras, números y guiones (ej. INC-1).",
-  desconocido:
-    "No se pudo guardar el estudiante. Revisa la conexión e intenta de nuevo.",
 };
 
 // Para buscar sin importar mayúsculas ni tildes
@@ -48,16 +37,6 @@ const normalizar = (s: string) =>
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .trim();
-
-const porNombre = (a: Estudiante, b: Estudiante) =>
-  a.nombre.localeCompare(b.nombre, "es") || a.codigo.localeCompare(b.codigo);
-
-interface FormEstudiante {
-  modo: "nuevo" | "editar";
-  nombre: string;
-  codigo: string;
-  original: string | null; // código antes de editar
-}
 
 export default function Captura() {
   const [examenes, setExamenes] = useState<ExamenResumen[]>([]);
@@ -73,8 +52,6 @@ export default function Captura() {
   const [busqueda, setBusqueda] = useState("");
   const [enfocado, setEnfocado] = useState(false);
   const [resaltado, setResaltado] = useState(0);
-  const [formulario, setFormulario] = useState<FormEstudiante | null>(null);
-  const [guardandoEst, setGuardandoEst] = useState(false);
 
   // Captura de respuestas
   const [resp, setResp] = useState<(Opcion | null)[]>([]);
@@ -115,13 +92,12 @@ export default function Captura() {
     setIntentos([]);
     setResp([]);
     setSeleccionado(null);
-    setFormulario(null);
     setBusqueda("");
+    setEnfocado(false);
     setBusquedaTabla("");
     setPagina(0);
     setSeleccion(new Set());
     setMensaje(null);
-    setEnfocado(false);
 
     Promise.all([
       listarPreguntasDeExamen(examenId),
@@ -188,11 +164,11 @@ export default function Captura() {
   const todosMarcados =
     idsVisibles.length > 0 && idsVisibles.every((id) => seleccion.has(id));
 
-  // ---------- Selección y edición de estudiantes ----------
+  // ---------- Selección de estudiantes ----------
 
   function elegir(est: Estudiante) {
-    setEnfocado(false);
     const previo = intentoDe.get(est.codigo);
+    setEnfocado(false);
     setSeleccionado(est);
     setResp(
       preguntas.map((p) =>
@@ -201,7 +177,6 @@ export default function Captura() {
     );
     setBusqueda("");
     setResaltado(0);
-    setFormulario(null);
     setMensaje(null);
   }
 
@@ -210,6 +185,7 @@ export default function Captura() {
     setResp(Array(preguntas.length).fill(null));
     setBusqueda("");
     setResaltado(0);
+    setTimeout(() => buscadorRef.current?.focus(), 0);
   }
 
   function teclaBuscador(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -223,99 +199,6 @@ export default function Captura() {
       e.preventDefault();
       const s = sugerencias[resaltado];
       if (s) elegir(s);
-    }
-  }
-
-  function abrirNuevo() {
-    setEnfocado(false);
-    setFormulario({
-      modo: "nuevo",
-      nombre: busqueda.trim(),
-      codigo: "",
-      original: null,
-    });
-    setMensaje(null);
-  }
-
-  function abrirEditar() {
-    if (!seleccionado) return;
-    setFormulario({
-      modo: "editar",
-      nombre: seleccionado.nombre,
-      codigo: seleccionado.codigo,
-      original: seleccionado.codigo,
-    });
-    setMensaje(null);
-  }
-
-  async function guardarEstudiante() {
-    if (!formulario || guardandoEst) return;
-
-    const nombre = formulario.nombre.trim().replace(/\s+/g, " ");
-    const codigo = formulario.codigo.trim().toUpperCase();
-
-    if (!nombre) {
-      return setMensaje({
-        tipo: "error",
-        texto: "Escribe el nombre del estudiante.",
-      });
-    }
-    if (!CODIGO_REGEX.test(codigo)) {
-      return setMensaje({
-        tipo: "error",
-        texto: MENSAJE_ERROR_ESTUDIANTE.formato_invalido,
-      });
-    }
-
-    // Aviso de posible duplicado por nombre
-    const homonimo = estudiantes.find(
-      (e) =>
-        e.codigo !== formulario.original &&
-        normalizar(e.nombre) === normalizar(nombre),
-    );
-    if (
-      homonimo &&
-      !confirm(
-        `Ya existe un estudiante llamado "${homonimo.nombre}" (código ${homonimo.codigo}). ¿Guardar de todas formas?`,
-      )
-    )
-      return;
-
-    setMensaje(null);
-    setGuardandoEst(true);
-    const r =
-      formulario.modo === "nuevo"
-        ? await crearEstudiante(codigo, nombre)
-        : await actualizarEstudiante(formulario.original!, codigo, nombre);
-    setGuardandoEst(false);
-
-    if (r.estudiante === null) {
-      return setMensaje({
-        tipo: "error",
-        texto: MENSAJE_ERROR_ESTUDIANTE[r.error],
-      });
-    }
-
-    const est = r.estudiante;
-    const codigoAnterior = formulario.original;
-    setEstudiantes((prev) =>
-      [...prev.filter((e) => e.codigo !== codigoAnterior), est].sort(porNombre),
-    );
-
-    if (formulario.modo === "editar") {
-      setIntentos((prev) =>
-        prev.map((i) =>
-          i.codigo === codigoAnterior
-            ? { ...i, codigo: est.codigo, nombre: est.nombre }
-            : i,
-        ),
-      );
-      setSeleccionado(est);
-      setFormulario(null);
-      setMensaje({ tipo: "ok", texto: "Datos del estudiante actualizados." });
-    } else {
-      elegir(est);
-      setMensaje({ tipo: "ok", texto: `${est.nombre} agregado.` });
     }
   }
 
@@ -387,7 +270,7 @@ export default function Captura() {
           tipo: "error",
           texto:
             fallo === "estudiante_no_existe"
-              ? "Ese estudiante ya no existe. Vuelve a buscarlo o agrégalo de nuevo."
+              ? "Ese estudiante ya no existe. Recarga la página y vuelve a buscarlo."
               : "No se pudo guardar. Revisa la conexión e intenta de nuevo.",
         });
       }
@@ -492,8 +375,16 @@ export default function Captura() {
     }
   }
 
-  if (errorCarga)
-    return <p>No se pudo cargar la información. Recarga la página.</p>;
+  if (errorCarga) {
+    return (
+      <div className="captura">
+        <Encabezado />
+        <p className="error">
+          No se pudo cargar la información. Recarga la página.
+        </p>
+      </div>
+    );
+  }
   if (examenId === null) {
     return (
       <div className="captura">
@@ -534,62 +425,7 @@ export default function Captura() {
         </p>
       ) : (
         <section className="fila-captura">
-          {formulario ? (
-            <form
-              className="form-estudiante"
-              onSubmit={(e) => {
-                e.preventDefault();
-                guardarEstudiante();
-              }}
-            >
-              <h3>
-                {formulario.modo === "nuevo"
-                  ? "Nuevo estudiante"
-                  : "Editar estudiante"}
-              </h3>
-              <label>
-                Nombre completo
-                <input
-                  value={formulario.nombre}
-                  onChange={(e) =>
-                    setFormulario({ ...formulario, nombre: e.target.value })
-                  }
-                  autoComplete="off"
-                  autoFocus
-                />
-              </label>
-              <label>
-                Código
-                <input
-                  value={formulario.codigo}
-                  onChange={(e) =>
-                    setFormulario({
-                      ...formulario,
-                      codigo: e.target.value.toUpperCase(),
-                    })
-                  }
-                  placeholder="INC-1"
-                  autoComplete="off"
-                />
-              </label>
-              {formulario.modo === "editar" &&
-                formulario.codigo.trim().toUpperCase() !==
-                  formulario.original && (
-                  <p className="ayuda">
-                    Al cambiar el código, sus respuestas ya cargadas pasan al
-                    código nuevo.
-                  </p>
-                )}
-              <div className="fila">
-                <button type="submit" disabled={guardandoEst}>
-                  {guardandoEst ? "Guardando…" : "Guardar estudiante"}
-                </button>
-                <button type="button" onClick={() => setFormulario(null)}>
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          ) : seleccionado ? (
+          {seleccionado ? (
             <>
               <div className="estudiante-sel">
                 <div>
@@ -600,9 +436,6 @@ export default function Captura() {
                   </label>
                 </div>
                 <div className="fila">
-                  <button type="button" onClick={abrirEditar}>
-                    Editar datos
-                  </button>
                   <button type="button" onClick={quitarSeleccion}>
                     Cambiar estudiante
                   </button>
@@ -639,7 +472,8 @@ export default function Captura() {
               </div>
 
               <p className="vista">
-                A: {vista.literal} · B: {vista.inferencial} · C: {vista.critico}{" "}
+                A-B-C:{" "}
+                <strong>{`${vista.literal}-${vista.inferencial}-${vista.critico}`}</strong>{" "}
                 · Respondidas: {contestadas} de {preguntas.length} →{" "}
                 <strong>
                   {vista.nivel
@@ -664,48 +498,47 @@ export default function Captura() {
           ) : (
             <div className="campo">
               <span className="rotulo">Estudiante (busca por nombre)</span>
-              <div className="fila">
-                <div className="combo">
-                  <input
-                    ref={buscadorRef}
-                    value={busqueda}
-                    onChange={(e) => {
-                      setBusqueda(e.target.value);
-                      setResaltado(0);
-                    }}
-                    onFocus={() => setEnfocado(true)}
-                    onBlur={() => setEnfocado(false)}
-                    onKeyDown={teclaBuscador}
-                    placeholder="Escribe el nombre…"
-                    aria-label="Buscar estudiante por nombre"
-                    autoComplete="off"
-                  />
-                  {enfocado && (
-                    <ul className="sugerencias">
-                      {sugerencias.map((e, i) => (
-                        <li
-                          key={e.codigo}
-                          className={i === resaltado ? "activa" : ""}
-                          onMouseDown={(ev) => {
-                            ev.preventDefault();
-                            elegir(e);
-                          }}
-                        >
-                          <span>{e.nombre}</span>
-                          {intentoDe.has(e.codigo) && (
-                            <span className="tag">Ya cargado</span>
-                          )}
-                        </li>
-                      ))}
-                      {sugerencias.length === 0 && (
-                        <li className="vacia">Ningún estudiante coincide.</li>
-                      )}
-                    </ul>
-                  )}
-                </div>
-                <button type="button" onClick={abrirNuevo}>
-                  + Nuevo estudiante
-                </button>
+              <div className="combo">
+                <input
+                  ref={buscadorRef}
+                  value={busqueda}
+                  onChange={(e) => {
+                    setBusqueda(e.target.value);
+                    setResaltado(0);
+                  }}
+                  onFocus={() => setEnfocado(true)}
+                  onBlur={() => setEnfocado(false)}
+                  onKeyDown={teclaBuscador}
+                  placeholder="Escribe el nombre…"
+                  aria-label="Buscar estudiante por nombre"
+                  autoComplete="off"
+                />
+                {enfocado && (
+                  <ul className="sugerencias">
+                    {sugerencias.map((e, i) => (
+                      <li
+                        key={e.codigo}
+                        className={i === resaltado ? "activa" : ""}
+                        onMouseDown={(ev) => {
+                          ev.preventDefault();
+                          elegir(e);
+                        }}
+                      >
+                        <span>{e.nombre}</span>
+                        {intentoDe.has(e.codigo) && (
+                          <span className="tag">ya cargado</span>
+                        )}
+                      </li>
+                    ))}
+                    {sugerencias.length === 0 && (
+                      <li className="vacia">
+                        {estudiantes.length === 0
+                          ? "Aún no hay estudiantes registrados. Pídele al administrador que los agregue."
+                          : "Ningún estudiante coincide. Si no está registrado, pídele al administrador que lo agregue."}
+                      </li>
+                    )}
+                  </ul>
+                )}
               </div>
             </div>
           )}
@@ -770,8 +603,9 @@ export default function Captura() {
                           aria-label="Seleccionar todos los de esta página"
                         />
                       </th>
-                      {/* <th>Nombre</th> */}
                       <th>Código</th>
+                      <th>Nombre</th>
+
                       {preguntas.map((p) => (
                         <th key={p.pregunta_id} className="l">
                           {p.numero}
@@ -807,8 +641,8 @@ export default function Captura() {
                               aria-label={`Seleccionar ${intento.nombre}`}
                             />
                           </td>
-                          {/* <td>{intento.nombre}</td> */}
                           <td>{intento.codigo}</td>
+                          <td>{intento.nombre}</td>
                           {letras.map((l, i) => (
                             <td key={i} className="l">
                               {l ?? "·"}
