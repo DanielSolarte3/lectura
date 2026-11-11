@@ -79,8 +79,16 @@ export default function Resultados() {
     await exportarExcel(
       filas,
       [
-        { examen: nombreExamen(preId), preguntas: sumasPre },
-        { examen: nombreExamen(postId), preguntas: sumasPost },
+        {
+          prueba: "Pre-Test",
+          examen: nombreExamen(preId),
+          preguntas: sumasPre,
+        },
+        {
+          prueba: "Post-Test",
+          examen: nombreExamen(postId),
+          preguntas: sumasPost,
+        },
       ],
       `resultados-lectura-${fecha}`,
     );

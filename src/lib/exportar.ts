@@ -8,7 +8,11 @@ import {
 
 export async function exportarExcel(
   filas: FilaEstudiante[],
-  sumas: { examen: string; preguntas: SumaPregunta[] }[],
+  sumas: {
+    prueba: "Pre-Test" | "Post-Test";
+    examen: string;
+    preguntas: SumaPregunta[];
+  }[],
   nombreArchivo: string,
 ) {
   const XLSX = await import("xlsx");
@@ -31,6 +35,7 @@ export async function exportarExcel(
 
   const porPregunta = sumas.flatMap((s) =>
     s.preguntas.map((p) => ({
+      Prueba: s.prueba,
       Examen: s.examen,
       Pregunta: p.numero,
       Texto: p.texto ?? "",
@@ -42,6 +47,7 @@ export async function exportarExcel(
 
   const porTexto = sumas.flatMap((s) =>
     sumarPorTexto(s.preguntas).map((t) => ({
+      Prueba: s.prueba,
       Examen: s.examen,
       Texto: t.texto,
       Preguntas: t.preguntas.join(", "),
